@@ -1,5 +1,5 @@
 use crate::ast::AstNode;
-use crate::error::DynoResult;
+use crate::error::*;
 use crate::lexer::Token;
 
 struct Parser {
@@ -8,22 +8,38 @@ struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, index: 0 }
     }
 
-    pub fn peek(&self) -> &Token {
-        &self.tokens[self.index]
+    fn peek(&self) -> DynoResult<&Token> {
+        if self.is_eof() {
+            return Err(DynoError::TokenStreamOutOfBounds());
+        }
+
+        Ok(&self.tokens[self.index])
     }
 
-    pub fn peek_next(&mut self, index: usize) -> &Token {
-        &self.tokens[self.index + index]
+    fn peek_next(&self, index: usize) -> DynoResult<&Token> {
+        if self.index + index >= self.tokens.len() {
+            return Err(DynoError::TokenStreamOutOfBounds());
+        }
+
+        Ok(&self.tokens[self.index + index])
     }
 
-    pub fn consume(&mut self) -> &Token {
+    fn consume(&mut self) -> DynoResult<&Token> {
+        if self.is_eof() {
+            return Err(DynoError::TokenStreamOutOfBounds());
+        }
+
         let result = &self.tokens[self.index];
         self.index += 1;
-        result
+        Ok(result)
+    }
+
+    fn is_eof(&self) -> bool {
+        self.index >= self.tokens.len()
     }
 }
 
