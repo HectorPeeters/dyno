@@ -4,7 +4,7 @@ mod lexer;
 mod parser;
 
 fn main() -> error::DynoResult<()> {
-    let tokens = lexer::lex("12 + 9 / 4")?;
+    let tokens = lexer::lex("12 + 9")?;
 
     println!("Tokens:");
     for token in &tokens {

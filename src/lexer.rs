@@ -27,6 +27,8 @@ pub enum TokenType {
 
     #[error]
     Error,
+
+    Eof,
 }
 
 #[derive(Debug)]
@@ -94,6 +96,8 @@ pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
         }
     }
 
+    tokens.push(Token::with_type(TokenType::Eof));
+
     return Ok(tokens);
 }
 
@@ -111,7 +115,8 @@ mod tests {
     #[test]
     fn lexer_empty() {
         let tokens = get_tokens("");
-        assert_eq!(tokens.len(), 0);
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].token_type, Eof);
     }
 
     #[test]
@@ -122,6 +127,7 @@ mod tests {
         assert_eq!(tokens[1], Token::new(IntegerLiteral, "0"));
         assert_eq!(tokens[2], Token::new(IntegerLiteral, "439394474"));
         assert_eq!(tokens[3], Token::new(IntegerLiteral, "123"));
+        assert_eq!(tokens[4].token_type, Eof);
     }
 
     #[test]
@@ -132,5 +138,6 @@ mod tests {
         assert_eq!(tokens[1].token_type, Minus);
         assert_eq!(tokens[2].token_type, Asterix);
         assert_eq!(tokens[3].token_type, Slash);
+        assert_eq!(tokens[4].token_type, Eof);
     }
 }

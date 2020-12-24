@@ -5,7 +5,8 @@ use std::ops::Range;
 pub enum DynoError {
     LexerError(String, Range<usize>),
     TokenStreamOutOfBounds(),
-    ExpectedTokenFailed(TokenType, TokenType),
+    IntegerParseError(String),
+    UnexpectedTokenError(TokenType, Vec<TokenType>),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
