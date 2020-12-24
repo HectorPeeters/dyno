@@ -1,6 +1,6 @@
 use logos::Logos;
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, Clone, PartialEq)]
 pub enum Token {
     #[regex(r"[ \t\n\f]+")]
     Whitespace,
