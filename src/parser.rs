@@ -1,4 +1,5 @@
 use crate::ast::AstNode;
+use crate::error::DynoResult;
 use crate::lexer::Token;
 
 struct Parser {
@@ -26,6 +27,6 @@ impl Parser {
     }
 }
 
-pub fn parse(input: Vec<Token>) -> AstNode {
-    AstNode::Empty()
+pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
+    Ok(AstNode::Empty())
 }
