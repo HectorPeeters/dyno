@@ -1,19 +1,20 @@
 use crate::error::*;
 use logos::Logos;
+use std::ops::Range;
 
-#[derive(Logos, Debug, Clone, PartialEq)]
-pub enum Token {
+#[derive(Logos, Debug, Copy, Clone, PartialEq)]
+pub enum TokenType {
     #[regex(r"[ \t\n\f]+")]
     Whitespace,
 
     #[regex(r"if")]
     If,
 
-    #[regex(r"[a-zA-Z]+", |lex| lex.slice().to_string())]
-    Identifier(String),
+    #[regex(r"[a-zA-Z]+")]
+    Identifier,
 
-    #[regex(r"[0-9]+", |lex| lex.slice().to_string())]
-    IntegerLiteral(String),
+    #[regex(r"[0-9]+")]
+    IntegerLiteral,
 
     #[regex(r"\+")]
     Plus,
@@ -28,26 +29,68 @@ pub enum Token {
     Error,
 }
 
+#[derive(Debug)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub value: String,
+    pub span: Range<usize>,
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.token_type == other.token_type && self.value == other.value
+    }
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, value: &str) -> Self {
+        Self {
+            token_type,
+            value: value.to_string(),
+            span: 0..0,
+        }
+    }
+
+    pub fn with_type(token_type: TokenType) -> Self {
+        Self {
+            token_type,
+            value: String::default(),
+            span: 0..0,
+        }
+    }
+
+    pub fn new_with_span(token_type: TokenType, value: &str, span: Range<usize>) -> Self {
+        Self {
+            token_type,
+            value: value.to_string(),
+            span,
+        }
+    }
+}
+
 pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
-    let mut lex = Token::lexer(input);
+    let mut lex = TokenType::lexer(input);
 
     let mut tokens: Vec<Token> = vec![];
 
     loop {
-        let token = lex.next();
+        let token_type = lex.next();
 
-        if token.is_none() {
+        if token_type.is_none() {
             break;
         }
 
-        let token = token.unwrap();
+        let token_type = token_type.unwrap();
 
-        match token {
-            Token::Error => {
+        match token_type {
+            TokenType::Error => {
                 return Err(DynoError::LexerError(lex.slice().to_string(), lex.span()));
             }
-            Token::Whitespace => {}
-            _ => tokens.push(token),
+            TokenType::Whitespace => {}
+            _ => {
+                let token = Token::new_with_span(token_type, lex.slice(), lex.span());
+                tokens.push(token);
+            }
         }
     }
 
@@ -56,7 +99,7 @@ pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
 
 #[cfg(test)]
 mod tests {
-    use super::Token::*;
+    use super::TokenType::*;
     use super::*;
 
     fn get_tokens(input: &str) -> Vec<Token> {
@@ -75,19 +118,19 @@ mod tests {
     fn lexer_integer_literal() {
         let tokens = get_tokens("12 0 439394474 123");
 
-        assert_eq!(tokens[0], IntegerLiteral("12".to_string()));
-        assert_eq!(tokens[1], IntegerLiteral("0".to_string()));
-        assert_eq!(tokens[2], IntegerLiteral("439394474".to_string()));
-        assert_eq!(tokens[3], IntegerLiteral("123".to_string()));
+        assert_eq!(tokens[0], Token::new(IntegerLiteral, "12"));
+        assert_eq!(tokens[1], Token::new(IntegerLiteral, "0"));
+        assert_eq!(tokens[2], Token::new(IntegerLiteral, "439394474"));
+        assert_eq!(tokens[3], Token::new(IntegerLiteral, "123"));
     }
 
     #[test]
     fn lexer_binary_operands() {
         let tokens = get_tokens("+-*/");
 
-        assert_eq!(tokens[0], Plus);
-        assert_eq!(tokens[1], Minus);
-        assert_eq!(tokens[2], Asterix);
-        assert_eq!(tokens[3], Slash);
+        assert_eq!(tokens[0].token_type, Plus);
+        assert_eq!(tokens[1].token_type, Minus);
+        assert_eq!(tokens[2].token_type, Asterix);
+        assert_eq!(tokens[3].token_type, Slash);
     }
 }

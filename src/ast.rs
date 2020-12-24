@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum BinaryOperation {
     Add,
     Subtract,
@@ -6,7 +6,7 @@ pub enum BinaryOperation {
     Divide,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AstNode {
     BinaryOperation(Box<AstNode>, Box<AstNode>, BinaryOperation),
     IntegerLiteral(u128),

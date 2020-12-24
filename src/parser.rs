@@ -1,6 +1,6 @@
 use crate::ast::AstNode;
 use crate::error::*;
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenType};
 
 struct Parser {
     tokens: Vec<Token>,
@@ -38,21 +38,44 @@ impl Parser {
         Ok(result)
     }
 
+    fn consume_expect(&mut self, expected: TokenType) -> DynoResult<&Token> {
+        let token = self.consume()?;
+
+        if token.token_type != expected {
+            return Err(DynoError::ExpectedTokenFailed(token.token_type, expected));
+        }
+
+        Ok(token)
+    }
+
     fn is_eof(&self) -> bool {
         self.index >= self.tokens.len()
+    }
+
+    fn parse_integer_literal(&mut self) -> AstNode {
+        AstNode::Empty()
     }
 }
 
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
+    let mut parser = Parser::new(input);
+
+    loop {
+        if parser.is_eof() {
+            break;
+        }
+
+        let token = parser.consume();
+    }
+
     Ok(AstNode::Empty())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::AstNode::*;
     use crate::ast::BinaryOperation::*;
-    use crate::lexer::Token::*;
+    use crate::lexer::TokenType::*;
 
     #[test]
     fn parser_new() {
@@ -63,43 +86,51 @@ mod tests {
 
     #[test]
     fn parser_peek() {
-        let parser = Parser::new(vec![Plus, Whitespace, Minus]);
+        let mut parser = Parser::new(vec![
+            Token::with_type(Plus),
+            Token::with_type(Whitespace),
+            Token::with_type(Minus),
+        ]);
 
-        let token = parser.peek();
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Plus);
-
-        let token = parser.peek_next(0);
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Plus);
-
-        let token = parser.peek_next(1);
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Whitespace);
-
-        let token = parser.peek_next(2);
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Minus);
+        assert_eq!(parser.peek().unwrap().token_type, Plus);
+        assert_eq!(parser.peek_next(0).unwrap().token_type, Plus);
+        assert_eq!(parser.peek_next(1).unwrap().token_type, Whitespace);
+        assert_eq!(parser.peek_next(2).unwrap().token_type, Minus);
 
         assert!(parser.peek_next(3).is_err());
     }
 
     #[test]
     fn parser_consume() {
-        let mut parser = Parser::new(vec![Plus, Whitespace, Minus]);
+        let mut parser = Parser::new(vec![
+            Token::with_type(Plus),
+            Token::with_type(Whitespace),
+            Token::with_type(Minus),
+        ]);
 
-        let token = parser.consume();
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Plus);
-
-        let token = parser.consume();
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Whitespace);
-
-        let token = parser.consume();
-        assert!(token.is_ok());
-        assert_eq!(*token.unwrap(), Minus);
+        assert_eq!(parser.consume().unwrap().token_type, Plus);
+        assert_eq!(parser.consume().unwrap().token_type, Whitespace);
+        assert_eq!(parser.consume().unwrap().token_type, Minus);
 
         assert!(parser.consume().is_err());
     }
+
+    //    #[test]
+    //    fn parser_basic_binary_op() {
+    //        let ast = parse(vec![
+    //            Token::new(IntegerLiteral, "12"),
+    //            Token::new(Plus, "+"),
+    //            Token::new(IntegerLiteral, "4"),
+    //        ])
+    //        .unwrap();
+    //
+    //        assert_eq!(
+    //            ast,
+    //            AstNode::BinaryOperation(
+    //                Box::new(AstNode::IntegerLiteral(12)),
+    //                Box::new(AstNode::IntegerLiteral(4)),
+    //                Add
+    //            )
+    //        );
+    //    }
 }
