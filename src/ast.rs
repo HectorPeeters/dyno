@@ -13,8 +13,7 @@ pub enum BinaryOperationType {
 pub enum AstNode {
     BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
     IntegerLiteral(u128),
-    Block(Vec<Box<AstNode>>),
-    Empty(),
+    Block(Vec<AstNode>),
 }
 
 impl BinaryOperationType {

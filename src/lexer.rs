@@ -98,7 +98,7 @@ pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
 
     tokens.push(Token::with_type(TokenType::Eof));
 
-    return Ok(tokens);
+    Ok(tokens)
 }
 
 #[cfg(test)]
