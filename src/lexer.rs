@@ -140,4 +140,14 @@ mod tests {
         assert_eq!(tokens[3].token_type, Slash);
         assert_eq!(tokens[4].token_type, Eof);
     }
+    #[test]
+    fn lexer_test_error() {
+        let tokens = lex("&");
+
+        assert!(tokens.is_err());
+        assert_eq!(
+            tokens.err().unwrap(),
+            DynoError::LexerError("&".to_string(), 0..1)
+        );
+    }
 }

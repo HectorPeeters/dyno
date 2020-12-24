@@ -246,4 +246,90 @@ mod tests {
             )])
         );
     }
+
+    #[test]
+    fn parser_consume_out_of_bounds_error() {
+        let mut parser = Parser::new(vec![]);
+        let token = parser.consume();
+
+        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+    }
+
+    #[test]
+    fn parser_peek_out_of_bounds_error() {
+        let parser = Parser::new(vec![]);
+        let token = parser.peek();
+
+        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+    }
+
+    #[test]
+    fn parser_peek_next_out_of_bounds_error() {
+        let parser = Parser::new(vec![Token::with_type(Eof)]);
+        let token = parser.peek_next(1);
+
+        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+    }
+
+    #[test]
+    fn parser_consume_expect_error() {
+        let mut parser = Parser::new(vec![Token::with_type(Eof)]);
+        let token = parser.consume_expect(IntegerLiteral);
+
+        assert_eq!(
+            token,
+            Err(DynoError::UnexpectedTokenError(Eof, vec![IntegerLiteral]))
+        );
+    }
+
+    #[test]
+    fn parser_integer_literal_error() {
+        let mut parser = Parser::new(vec![Token::new(IntegerLiteral, "a")]);
+        let node = parser.parse_integer_literal();
+
+        assert_eq!(node, Err(DynoError::IntegerParseError("a".to_string())));
+    }
+
+    #[test]
+    fn parser_unary_expression_error() {
+        let mut parser = Parser::new(vec![Token::new(IntegerLiteral, "a")]);
+        let node = parser.parse_integer_literal();
+
+        assert_eq!(node, Err(DynoError::IntegerParseError("a".to_string())));
+    }
+
+    #[test]
+    fn parser_expression_two_operands_error() {
+        let mut parser = Parser::new(vec![
+            Token::new(IntegerLiteral, "5"),
+            Token::with_type(TokenType::Plus),
+            Token::with_type(TokenType::Plus),
+            Token::new(IntegerLiteral, "12"),
+        ]);
+        let node = parser.parse_expression(0);
+
+        assert_eq!(
+            node,
+            Err(DynoError::UnexpectedTokenError(Plus, vec![IntegerLiteral]))
+        );
+    }
+
+    #[test]
+    fn parser_expression_two_ints_error() {
+        let mut parser = Parser::new(vec![
+            Token::new(IntegerLiteral, "5"),
+            Token::with_type(TokenType::Plus),
+            Token::new(IntegerLiteral, "12"),
+            Token::new(IntegerLiteral, "8"),
+        ]);
+        let node = parser.parse_expression(0);
+
+        assert_eq!(
+            node,
+            Err(DynoError::UnexpectedTokenError(
+                IntegerLiteral,
+                vec![Plus, Minus, Asterix, Slash]
+            ))
+        );
+    }
 }

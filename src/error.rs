@@ -1,7 +1,7 @@
 use crate::lexer::TokenType;
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DynoError {
     LexerError(String, Range<usize>),
     TokenStreamOutOfBounds(),
