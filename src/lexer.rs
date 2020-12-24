@@ -1,3 +1,4 @@
+use crate::error::*;
 use logos::Logos;
 
 #[derive(Logos, Debug, Clone, PartialEq)]
@@ -27,7 +28,7 @@ pub enum Token {
     Error,
 }
 
-pub fn lex(input: &str) -> Vec<Token> {
+pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
     let mut lex = Token::lexer(input);
 
     let mut tokens: Vec<Token> = vec![];
@@ -42,8 +43,13 @@ pub fn lex(input: &str) -> Vec<Token> {
 
         let token = token.unwrap();
 
-        tokens.push(token);
+        match token {
+            Token::Error => {
+                return Err(DynoError::LexerError(lex.slice().to_string(), lex.span()));
+            }
+            _ => tokens.push(token),
+        }
     }
 
-    return tokens;
+    return Ok(tokens);
 }

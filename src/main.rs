@@ -3,8 +3,8 @@ mod error;
 mod lexer;
 mod parser;
 
-fn main() {
-    let tokens = lexer::lex("12 + 9 / 4");
+fn main() -> error::DynoResult<()> {
+    let tokens = lexer::lex("12 + 9 / 4")?;
 
     println!("Tokens:");
     for token in &tokens {
@@ -12,5 +12,7 @@ fn main() {
     }
 
     println!("\nAst:");
-    println!("{:#?}", parser::parse(tokens));
+    println!("{:#?}", parser::parse(tokens)?);
+
+    Ok(())
 }
