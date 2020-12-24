@@ -194,4 +194,56 @@ mod tests {
             ))])
         );
     }
+
+    #[test]
+    fn parser_precendence_a() {
+        let ast = parse(vec![
+            Token::new(IntegerLiteral, "12"),
+            Token::new(Plus, "+"),
+            Token::new(IntegerLiteral, "4"),
+            Token::new(Asterix, "*"),
+            Token::new(IntegerLiteral, "7"),
+            Token::with_type(Eof),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            ast,
+            AstNode::Block(vec![Box::new(AstNode::BinaryOperation(
+                Add,
+                Box::new(AstNode::IntegerLiteral(12)),
+                Box::new(AstNode::BinaryOperation(
+                    Multiply,
+                    Box::new(AstNode::IntegerLiteral(4)),
+                    Box::new(AstNode::IntegerLiteral(7)),
+                )),
+            ))])
+        );
+    }
+
+    #[test]
+    fn parser_precendence_b() {
+        let ast = parse(vec![
+            Token::new(IntegerLiteral, "12"),
+            Token::new(Asterix, "*"),
+            Token::new(IntegerLiteral, "4"),
+            Token::new(Plus, "+"),
+            Token::new(IntegerLiteral, "7"),
+            Token::with_type(Eof),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            ast,
+            AstNode::Block(vec![Box::new(AstNode::BinaryOperation(
+                Add,
+                Box::new(AstNode::BinaryOperation(
+                    Multiply,
+                    Box::new(AstNode::IntegerLiteral(12)),
+                    Box::new(AstNode::IntegerLiteral(4)),
+                )),
+                Box::new(AstNode::IntegerLiteral(7)),
+            ))])
+        );
+    }
 }
