@@ -46,6 +46,7 @@ pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
             Token::Error => {
                 return Err(DynoError::LexerError(lex.slice().to_string(), lex.span()));
             }
+            Token::Whitespace => {}
             _ => tokens.push(token),
         }
     }
@@ -75,12 +76,9 @@ mod tests {
         let tokens = get_tokens("12 0 439394474 123");
 
         assert_eq!(tokens[0], IntegerLiteral("12".to_string()));
-        assert_eq!(tokens[1], Whitespace);
-        assert_eq!(tokens[2], IntegerLiteral("0".to_string()));
-        assert_eq!(tokens[3], Whitespace);
-        assert_eq!(tokens[4], IntegerLiteral("439394474".to_string()));
-        assert_eq!(tokens[5], Whitespace);
-        assert_eq!(tokens[6], IntegerLiteral("123".to_string()));
+        assert_eq!(tokens[1], IntegerLiteral("0".to_string()));
+        assert_eq!(tokens[2], IntegerLiteral("439394474".to_string()));
+        assert_eq!(tokens[3], IntegerLiteral("123".to_string()));
     }
 
     #[test]
