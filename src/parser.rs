@@ -1,6 +1,6 @@
 use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
-use crate::lexer::{Token, TokenType};
+use crate::lexer::{lex, Token, TokenType};
 
 struct Parser {
     tokens: Vec<Token>,
@@ -187,13 +187,7 @@ mod tests {
 
     #[test]
     fn parser_basic_binary_op() {
-        let ast = parse(vec![
-            Token::new(IntegerLiteral, "12"),
-            Token::new(Plus, "+"),
-            Token::new(IntegerLiteral, "4"),
-            Token::with_type(Eof),
-        ])
-        .unwrap();
+        let ast = parse(lex("12 + 4").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -207,15 +201,7 @@ mod tests {
 
     #[test]
     fn parser_precendence_a() {
-        let ast = parse(vec![
-            Token::new(IntegerLiteral, "12"),
-            Token::new(Plus, "+"),
-            Token::new(IntegerLiteral, "4"),
-            Token::new(Asterix, "*"),
-            Token::new(IntegerLiteral, "7"),
-            Token::with_type(Eof),
-        ])
-        .unwrap();
+        let ast = parse(lex("12 + 4 * 7").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -233,15 +219,7 @@ mod tests {
 
     #[test]
     fn parser_precendence_b() {
-        let ast = parse(vec![
-            Token::new(IntegerLiteral, "12"),
-            Token::new(Asterix, "*"),
-            Token::new(IntegerLiteral, "4"),
-            Token::new(Plus, "+"),
-            Token::new(IntegerLiteral, "7"),
-            Token::with_type(Eof),
-        ])
-        .unwrap();
+        let ast = parse(lex("12 * 4 + 7").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -326,12 +304,8 @@ mod tests {
 
     #[test]
     fn parser_expression_two_ints_error() {
-        let mut parser = Parser::new(vec![
-            Token::new(IntegerLiteral, "5"),
-            Token::with_type(TokenType::Plus),
-            Token::new(IntegerLiteral, "12"),
-            Token::new(IntegerLiteral, "8"),
-        ]);
+        let mut parser = Parser::new(lex("5 + 12 8").unwrap()
+        );
         let node = parser.parse_expression(0);
 
         assert_eq!(
