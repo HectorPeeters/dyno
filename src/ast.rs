@@ -1,5 +1,6 @@
 use crate::error::*;
 use crate::lexer::TokenType;
+use crate::types::DynoType;
 
 #[derive(Debug, PartialEq)]
 pub enum BinaryOperationType {
@@ -12,7 +13,7 @@ pub enum BinaryOperationType {
 #[derive(Debug, PartialEq)]
 pub enum AstNode {
     BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
-    IntegerLiteral(u128),
+    IntegerLiteral(u128, u8),
     Block(Vec<AstNode>),
 }
 
@@ -45,6 +46,19 @@ impl BinaryOperationType {
             Self::Subtract => 1,
             Self::Multiply => 2,
             Self::Divide => 2,
+        }
+    }
+}
+
+impl AstNode {
+    fn get_type(&self) -> DynoType {
+        match self {
+            AstNode::BinaryOperation(t, left, right) => {
+                //TODO: this needs to be changed to proper type handling
+                left.get_type()
+            }
+            AstNode::IntegerLiteral(_, size) => DynoType::UnsignedInt(*size),
+            _ => panic!("Trying to get type of unsupported AST node"),
         }
     }
 }

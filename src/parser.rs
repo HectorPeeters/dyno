@@ -55,12 +55,22 @@ impl Parser {
         self.index >= self.tokens.len() || self.tokens[self.index].token_type == TokenType::Eof
     }
 
+    fn get_bit_count(value: u128) -> u8 {
+        let floating_point = value as f64;
+        let bits = floating_point.log2();
+
+        bits as u8 + 1
+    }
+
     fn parse_integer_literal(&mut self) -> DynoResult<AstNode> {
         let token = self.consume_expect(TokenType::IntegerLiteral)?;
 
         let value: Result<u128, _> = token.value.parse();
         match value {
-            Ok(x) => Ok(AstNode::IntegerLiteral(x)),
+            Ok(x) => {
+                let bits = Parser::get_bit_count(x);
+                Ok(AstNode::IntegerLiteral(x, bits))
+            }
             Err(_) => Err(DynoError::IntegerParseError(token.value.clone())),
         }
     }
@@ -189,8 +199,8 @@ mod tests {
             ast,
             AstNode::Block(vec![AstNode::BinaryOperation(
                 Add,
-                Box::new(AstNode::IntegerLiteral(12)),
-                Box::new(AstNode::IntegerLiteral(4)),
+                Box::new(AstNode::IntegerLiteral(12, 4)),
+                Box::new(AstNode::IntegerLiteral(4, 3)),
             )])
         );
     }
@@ -211,11 +221,11 @@ mod tests {
             ast,
             AstNode::Block(vec![AstNode::BinaryOperation(
                 Add,
-                Box::new(AstNode::IntegerLiteral(12)),
+                Box::new(AstNode::IntegerLiteral(12, 4)),
                 Box::new(AstNode::BinaryOperation(
                     Multiply,
-                    Box::new(AstNode::IntegerLiteral(4)),
-                    Box::new(AstNode::IntegerLiteral(7)),
+                    Box::new(AstNode::IntegerLiteral(4, 3)),
+                    Box::new(AstNode::IntegerLiteral(7, 3)),
                 )),
             )])
         );
@@ -239,10 +249,10 @@ mod tests {
                 Add,
                 Box::new(AstNode::BinaryOperation(
                     Multiply,
-                    Box::new(AstNode::IntegerLiteral(12)),
-                    Box::new(AstNode::IntegerLiteral(4)),
+                    Box::new(AstNode::IntegerLiteral(12, 4)),
+                    Box::new(AstNode::IntegerLiteral(4, 3)),
                 )),
-                Box::new(AstNode::IntegerLiteral(7)),
+                Box::new(AstNode::IntegerLiteral(7, 3)),
             )])
         );
     }
