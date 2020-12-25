@@ -4,6 +4,7 @@ mod lexer;
 mod parser;
 mod types;
 mod generator;
+mod elf;
 
 fn main() -> error::DynoResult<()> {
     let tokens = lexer::lex("12 + 9")?;
