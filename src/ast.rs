@@ -75,6 +75,18 @@ mod tests {
     use crate::ast::BinaryOperationType::*;
 
     #[test]
+    fn test_precendence() {
+        assert!(
+            BinaryOperationType::Multiply.get_precedence()
+                > BinaryOperationType::Add.get_precedence()
+        );
+        assert!(
+            BinaryOperationType::Divide.get_precedence()
+                > BinaryOperationType::Subtract.get_precedence()
+        );
+    }
+
+    #[test]
     fn test_bin_op_size() {
         let ast = AstNode::BinaryOperation(
             Add,

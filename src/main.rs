@@ -3,6 +3,7 @@ mod error;
 mod lexer;
 mod parser;
 mod types;
+mod generator;
 
 fn main() -> error::DynoResult<()> {
     let tokens = lexer::lex("12 + 9")?;
