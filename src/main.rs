@@ -12,7 +12,7 @@ fn main() -> error::DynoResult<()> {
     let elf_file = elf::ElfFileInfo {
         program_header_table: vec![elf::ElfProgramHeaderEntry {
             segment_type: elf::ElfProgramHeaderEntryType::PtLoad,
-            flags: 0x05,
+            flags: elf::ELF_PROGRAM_FLAG_READ | elf::ELF_PROGRAM_FLAG_EXECUTE,
             offset: 0x00,
             virtual_address: 0x400000,
             physical_address: 0x400000,

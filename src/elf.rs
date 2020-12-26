@@ -98,6 +98,10 @@ pub enum ElfSectionType {
     ShtLoos = 0x60000000,
 }
 
+pub const ELF_PROGRAM_FLAG_EXECUTE: u32 = 1;
+pub const ELF_PROGRAM_FLAG_WRITE: u32 = 2;
+pub const ELF_PROGRAM_FLAG_READ: u32 = 4;
+
 pub struct ElfSectionHeaderEntry {
     pub name: String,
     pub section_type: ElfSectionType,
