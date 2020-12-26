@@ -111,6 +111,19 @@ pub struct ElfSectionHeaderEntry {
     pub entry_size: u64,
 }
 
+pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
+    name: String::new(),
+    section_type: ElfSectionType::ShtNull,
+    flags: 0,
+    address: 0,
+    offset: 0,
+    size: 0,
+    link: 0,
+    info: 0,
+    address_align: 0,
+    entry_size: 0,
+};
+
 fn write(writer: &mut dyn Write, data: &[u8]) -> DynoResult<()> {
     match writer.write(data) {
         Ok(_) => Ok(()),
@@ -229,26 +242,12 @@ where
     Ok(())
 }
 
-pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
-    name: String::new(),
-    section_type: ElfSectionType::ShtNull,
-    flags: 0,
-    address: 0,
-    offset: 0,
-    size: 0,
-    link: 0,
-    info: 0,
-    address_align: 0,
-    entry_size: 0,
-};
-
 fn write_elf_section_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
     for (index, section) in elf_file.section_header_table.iter().enumerate() {
         let name_index: u32 = elf_file.get_name_offset(index);
-        println!("{}", name_index);
         write(writer, &name_index.to_le_bytes())?;
 
         write(writer, &(section.section_type as u32).to_le_bytes())?;
