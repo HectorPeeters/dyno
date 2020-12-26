@@ -146,6 +146,7 @@ mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
     use crate::lexer::TokenType::*;
+    use crate::lexer::lex;
 
     #[test]
     fn parser_new() {
