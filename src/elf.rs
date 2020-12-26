@@ -46,7 +46,7 @@ where
     Ok(())
 }
 
-fn write_elf_header_other<T>(writer: &mut T) -> DynoResult<()>
+fn write_elf_header_other<T>(writer: &mut T, header_table: Vec<ElfHeaderEntry>) -> DynoResult<()>
 where
     T: Write,
 {
@@ -76,15 +76,19 @@ where
     write(writer, &(0x40 as u16).to_le_bytes())?;
 
     // program header table size
-    write(writer, &(0x38 as u16).to_le_bytes())?;
+    const HEADER_TABLE_ENTRY_SIZE: u16 = 56;
+    write(
+        writer,
+        &(HEADER_TABLE_ENTRY_SIZE * header_table.len() as u16).to_le_bytes(),
+    )?;
 
     // program header entry num
-    write(writer, &(0x9 as u16).to_le_bytes())?;
+    write(writer, &(header_table.len() as u16).to_le_bytes())?;
 
     // section header table size
     write(writer, &(0x40 as u16).to_le_bytes())?;
 
-    // sectiokn header entry num
+    // section header entry num
     write(writer, &(0x1D as u16).to_le_bytes())?;
 
     // section name header table entry
@@ -93,12 +97,64 @@ where
     Ok(())
 }
 
+enum ElfHeaderEntryType {
+    PtNull = 0x00,
+    PtLoad = 0x01,
+    PtDynamic = 0x02,
+    PtInterp = 0x03,
+    PtNote = 0x04,
+    PtShlib = 0x05,
+    PtPhdr = 0x06,
+    PtLts = 0x07,
+    PtLoOs = 0x60000000,
+    PtHiOs = 0x6FFFFFFF,
+    PtLoProc = 0x70000000,
+    PtHiProc = 0x7FFFFFFF,
+}
+
+struct ElfHeaderEntry {
+    pub segment_type: ElfHeaderEntryType,
+    pub flags: u32,
+    pub offset: u64,
+    pub virtual_address: u64,
+    pub physical_address: u64,
+    pub file_size: u64,
+    pub memory_size: u64,
+    pub align: u64,
+}
+
+fn write_elf_header_table<T>(writer: &mut T, programs: Vec<ElfHeaderEntry>) -> DynoResult<()>
+where
+    T: Write,
+{
+    for program in programs {
+        write(writer, &(program.segment_type as u32).to_le_bytes())?;
+
+        write(writer, &program.flags.to_le_bytes())?;
+
+        write(writer, &program.offset.to_le_bytes())?;
+
+        write(writer, &program.virtual_address.to_le_bytes())?;
+
+        write(writer, &program.physical_address.to_le_bytes())?;
+
+        write(writer, &program.file_size.to_le_bytes())?;
+
+        write(writer, &program.memory_size.to_le_bytes())?;
+
+        write(writer, &program.align.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
 pub fn write_elf_header<T>(writer: &mut T) -> DynoResult<()>
 where
     T: Write,
 {
+    let header_table: Vec<ElfHeaderEntry> = vec![];
     write_elf_header_ident(writer)?;
-    write_elf_header_other(writer)?;
+    write_elf_header_other(writer, header_table)?;
 
     Ok(())
 }
@@ -126,14 +182,14 @@ mod tests {
     #[test]
     fn test_write_elf_header_other() {
         let mut writer = BufWriter::new(Vec::<u8>::new());
-        write_elf_header_other(&mut writer).unwrap();
+        write_elf_header_other(&mut writer, vec![]).unwrap();
 
         assert_eq!(
             writer.buffer(),
             &[
                 0x03, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00, 0x50, 0x05, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x19, 0x00, 0x00,
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x38, 0x00, 0x09, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x40, 0x00, 0x1D, 0x00, 0x1C, 0x00
             ]
         );
