@@ -31,6 +31,21 @@ impl ElfFileInfo {
 
         writer.buffer().to_vec()
     }
+
+    pub fn get_name_offset(&self, section_index: usize) -> u32 {
+        if self.section_header_table[section_index].name.len() == 0 {
+            return 0;
+        }
+
+        let mut result: u32 = 1;
+        for i in 0..section_index {
+            if self.section_header_table[i].name.len() != 0 {
+                result += self.section_header_table[i].name.len() as u32 + 1;
+            }
+        }
+
+        result
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -154,8 +169,9 @@ where
         &(0x40
             + program_header_size as u64
             + file_info.code.len() as u64
-            + file_info.get_names().len() as u64)
-            .to_le_bytes(),
+            + file_info.get_names().len() as u64
+            + 8)
+        .to_le_bytes(),
     )?;
 
     // flags
@@ -230,8 +246,9 @@ fn write_elf_section_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoRe
 where
     T: Write,
 {
-    for section in &elf_file.section_header_table {
-        let name_index: u32 = 0;
+    for (index, section) in elf_file.section_header_table.iter().enumerate() {
+        let name_index: u32 = elf_file.get_name_offset(index);
+        println!("{}", name_index);
         write(writer, &name_index.to_le_bytes())?;
 
         write(writer, &(section.section_type as u32).to_le_bytes())?;
