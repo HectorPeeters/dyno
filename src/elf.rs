@@ -21,25 +21,25 @@ pub struct ElfFileInfo {
 }
 
 impl ElfFileInfo {
-    pub fn get_names(&self) -> Vec<u8> {
+    pub fn get_names(&self) -> DynoResult<Vec<u8>> {
         let mut writer = std::io::BufWriter::new(vec![]);
 
         for section in &self.section_header_table {
-            write(&mut writer, section.name.as_bytes());
-            write(&mut writer, &[0x00]);
+            write(&mut writer, section.name.as_bytes())?;
+            write(&mut writer, &[0x00])?;
         }
 
-        writer.buffer().to_vec()
+        Ok(writer.buffer().to_vec())
     }
 
     pub fn get_name_offset(&self, section_index: usize) -> u32 {
-        if self.section_header_table[section_index].name.len() == 0 {
+        if self.section_header_table[section_index].name.is_empty() {
             return 0;
         }
 
         let mut result: u32 = 1;
         for i in 0..section_index {
-            if self.section_header_table[i].name.len() != 0 {
+            if !self.section_header_table[i].name.is_empty() {
                 result += self.section_header_table[i].name.len() as u32 + 1;
             }
         }
@@ -176,8 +176,6 @@ where
         PROGRAM_TABLE_ENTRY_SIZE * file_info.program_header_table.len() as u16;
 
     const SECTION_TABLE_ENTRY_SIZE: u16 = 64;
-    let section_header_size =
-        SECTION_TABLE_ENTRY_SIZE * file_info.section_header_table.len() as u16;
 
     // elf type
     let elf_type = ElfType::EtExec;
@@ -200,7 +198,7 @@ where
         &(0x40
             + program_header_size as u64
             + file_info.code.len() as u64
-            + file_info.get_names().len() as u64
+            + file_info.get_names()?.len() as u64
             + 8)
         .to_le_bytes(),
     )?;
@@ -301,7 +299,7 @@ where
 
     write(writer, &elf_file.code)?;
 
-    write(writer, &elf_file.get_names())?;
+    write(writer, &elf_file.get_names()?)?;
 
     write_elf_section_header(writer, elf_file)?;
 
