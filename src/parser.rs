@@ -145,8 +145,8 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
-    use crate::lexer::TokenType::*;
     use crate::lexer::lex;
+    use crate::lexer::TokenType::*;
 
     #[test]
     fn parser_new() {
@@ -305,8 +305,7 @@ mod tests {
 
     #[test]
     fn parser_expression_two_ints_error() {
-        let mut parser = Parser::new(lex("5 + 12 8").unwrap()
-        );
+        let mut parser = Parser::new(lex("5 + 12 8").unwrap());
         let node = parser.parse_expression(0);
 
         assert_eq!(

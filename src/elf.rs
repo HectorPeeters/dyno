@@ -1,6 +1,7 @@
 use crate::error::*;
 use std::io::Write;
 
+/// An enum representing all possible ELF file types.
 #[derive(Debug, Copy, Clone)]
 pub enum ElfType {
     EtNone = 0x00,
@@ -14,6 +15,10 @@ pub enum ElfType {
     EtHiProc = 0xFFFF,
 }
 
+/// Struct used to generate an ELF file.
+///
+/// The `program_header_table`, `section_header_table` and `code` field will written to the output
+/// file.
 pub struct ElfFileInfo {
     pub program_header_table: Vec<ElfProgramHeaderEntry>,
     pub section_header_table: Vec<ElfSectionHeaderEntry>,
@@ -21,6 +26,7 @@ pub struct ElfFileInfo {
 }
 
 impl ElfFileInfo {
+    /// Returns a byte array containing the names of all sections
     pub fn get_names(&self) -> DynoResult<Vec<u8>> {
         let mut writer = std::io::BufWriter::new(vec![]);
 
@@ -32,6 +38,7 @@ impl ElfFileInfo {
         Ok(writer.buffer().to_vec())
     }
 
+    /// Calculates the offset of a section name in the name byte array
     pub fn get_name_offset(&self, section_index: usize) -> u32 {
         if self.section_header_table[section_index].name.is_empty() {
             return 0;
@@ -40,6 +47,7 @@ impl ElfFileInfo {
         let mut result: u32 = 1;
         for i in 0..section_index {
             if !self.section_header_table[i].name.is_empty() {
+                // Add the size of the name plus one for a null byte
                 result += self.section_header_table[i].name.len() as u32 + 1;
             }
         }
@@ -48,6 +56,7 @@ impl ElfFileInfo {
     }
 }
 
+/// An enum representing the type of an ELF program header entry.
 #[derive(Debug, Copy, Clone)]
 pub enum ElfProgramHeaderEntryType {
     PtNull = 0x00,
@@ -129,6 +138,7 @@ pub struct ElfSectionHeaderEntry {
     pub entry_size: u64,
 }
 
+/// The NULL section added to every ELF program.
 pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
     name: String::new(),
     section_type: ElfSectionType::ShtNull,
@@ -142,6 +152,10 @@ pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
     entry_size: 0,
 };
 
+/// Helper function to write a byte array.
+///
+/// This function tries to write a byte array using a Write trait. If the write fails it returns a
+/// DynoError::ElfWriteError. If it succeeds, it returns an empty Ok value.
 fn write(writer: &mut dyn Write, data: &[u8]) -> DynoResult<()> {
     match writer.write(data) {
         Ok(_) => Ok(()),
@@ -149,6 +163,7 @@ fn write(writer: &mut dyn Write, data: &[u8]) -> DynoResult<()> {
     }
 }
 
+/// Writes the first part of the ELF header.
 fn write_elf_header_1<T>(writer: &mut T, file_info: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
@@ -233,74 +248,102 @@ where
     Ok(())
 }
 
+/// Writes the ELF program header.
 fn write_elf_program_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
     for program in &elf_file.program_header_table {
+        // the segment type
         write(writer, &(program.segment_type as u32).to_le_bytes())?;
 
+        // the flags of this segment
         write(writer, &program.flags.to_le_bytes())?;
 
+        // the segment offset
         write(writer, &program.offset.to_le_bytes())?;
 
+        // the virtual address of the segment
         write(writer, &program.virtual_address.to_le_bytes())?;
 
+        // the physical address of the segment, this is often the same as the virtual address
         write(writer, &program.physical_address.to_le_bytes())?;
 
+        // the size of the segment in the file
         write(writer, &program.file_size.to_le_bytes())?;
 
+        // the size of the segment in memory, this is often the same as the file_size
         write(writer, &program.memory_size.to_le_bytes())?;
 
+        // the alignment of the segment
         write(writer, &program.align.to_le_bytes())?;
     }
 
     Ok(())
 }
 
+/// Writes the ELF section header.
 fn write_elf_section_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
     for (index, section) in elf_file.section_header_table.iter().enumerate() {
+        // calculate the starting index in the .shstrtab section
         let name_index: u32 = elf_file.get_name_offset(index);
         write(writer, &name_index.to_le_bytes())?;
 
+        // the section type
         write(writer, &(section.section_type as u32).to_le_bytes())?;
 
+        // the flags for this section
         write(writer, &section.flags.to_le_bytes())?;
 
+        // the address of this section
         write(writer, &section.address.to_le_bytes())?;
 
+        // the offset of this section
         write(writer, &section.offset.to_le_bytes())?;
 
+        // the size of the section
         write(writer, &section.size.to_le_bytes())?;
 
+        // an optional link to another section
         write(writer, &section.link.to_le_bytes())?;
 
+        // the optional info of the section
         write(writer, &section.info.to_le_bytes())?;
 
+        // the alignment of the addresses in the section
         write(writer, &section.address_align.to_le_bytes())?;
 
+        // the size in bytes of each entry
         write(writer, &section.entry_size.to_le_bytes())?;
     }
 
     Ok(())
 }
 
+/// Writes a full ELF file to using a Write trait writer.
 pub fn write_elf_file<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
+    // write the first part of the header
     write_elf_header_1(writer, elf_file)?;
+
+    // write the program table header
     write_elf_program_header(writer, elf_file)?;
 
+    // write the padding
     write(writer, &[0; 8])?;
 
+    // write the actual code of the executabe
     write(writer, &elf_file.code)?;
 
+    // writes the names of all the sections
     write(writer, &elf_file.get_names()?)?;
 
+    // writes the section table header
     write_elf_section_header(writer, elf_file)?;
 
     Ok(())
