@@ -57,7 +57,7 @@ where
     let section_header_size = SECTION_TABLE_ENTRY_SIZE * file_info.section_table_count as u16;
 
     // elf type
-    let elf_type = ElfType::EtDyn;
+    let elf_type = ElfType::EtExec;
     write(writer, &(elf_type as u16).to_le_bytes())?;
 
     // machine
@@ -67,8 +67,7 @@ where
     write(writer, &(0x01 as u32).to_le_bytes())?;
 
     // entry
-    write(writer, &(0x550 as u64).to_le_bytes())?;
-
+    write(writer, &(0x400080 as u64).to_le_bytes())?;
     // program header offset
     write(writer, &(0x40 as u64).to_le_bytes())?;
 
@@ -86,7 +85,7 @@ where
     write(writer, &(0x40 as u16).to_le_bytes())?;
 
     // program header table size
-    write(writer, &(program_header_size as u16).to_le_bytes())?;
+    write(writer, &PROGRAM_TABLE_ENTRY_SIZE.to_le_bytes())?;
 
     // program header entry num
     write(
@@ -94,8 +93,8 @@ where
         &(file_info.program_table_count as u16).to_le_bytes(),
     )?;
 
-    // section header table size
-    write(writer, &(section_header_size as u16).to_le_bytes())?;
+    // section header entry size
+    write(writer, &SECTION_TABLE_ENTRY_SIZE.to_le_bytes())?;
 
     // section header entry num
     write(
@@ -104,7 +103,7 @@ where
     )?;
 
     // section name header table entry
-    write(writer, &(0x00 as u16).to_le_bytes())?;
+    write(writer, &(0x02 as u16).to_le_bytes())?;
 
     Ok(())
 }
@@ -188,16 +187,16 @@ pub enum ElfSectionType {
 }
 
 pub struct ElfSectionHeaderEntry {
-    name: u32,
-    section_type: ElfSectionType,
-    flags: u64,
-    address: u64,
-    offset: u64,
-    size: u64,
-    link: u32,
-    info: u32,
-    address_align: u64,
-    entry_size: u64,
+    pub name: u32,
+    pub section_type: ElfSectionType,
+    pub flags: u64,
+    pub address: u64,
+    pub offset: u64,
+    pub size: u64,
+    pub link: u32,
+    pub info: u32,
+    pub address_align: u64,
+    pub entry_size: u64,
 }
 
 pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
@@ -254,17 +253,25 @@ pub fn write_elf_file<T>(
 where
     T: Write,
 {
+    let names_data = &[
+        0x00, 0x2E, 0x73, 0x68, 0x73, 0x72, 0x74, 0x61, 0x62, 0x00, 0x2E, 0x74, 0x65, 0x78, 0x74,
+    ];
+
     let file_info = ElfFileInfo {
         program_table_count: program_header.len() as u8,
         code_size: code.len() as u64,
-        section_names_size: 0,
+        section_names_size: names_data.len() as u64,
         section_table_count: section_header.len() as u8,
     };
 
     write_elf_header_1(writer, &file_info)?;
     write_elf_program_header(writer, program_header)?;
 
+    write(writer, &[0; 8])?;
+
     write(writer, code)?;
+
+    write(writer, names_data)?;
 
     write_elf_section_header(writer, section_header)?;
 
