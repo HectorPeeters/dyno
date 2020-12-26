@@ -14,98 +14,23 @@ pub enum ElfType {
     EtHiProc = 0xFFFF,
 }
 
-fn write(writer: &mut dyn Write, data: &[u8]) -> DynoResult<()> {
-    match writer.write(data) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(DynoError::ElfWriteError()),
+pub struct ElfFileInfo {
+    pub program_header_table: Vec<ElfProgramHeaderEntry>,
+    pub section_header_table: Vec<ElfSectionHeaderEntry>,
+    pub code: Vec<u8>,
+}
+
+impl ElfFileInfo {
+    pub fn get_names(&self) -> Vec<u8> {
+        let mut writer = std::io::BufWriter::new(vec![]);
+
+        for section in &self.section_header_table {
+            write(&mut writer, section.name.as_bytes());
+            write(&mut writer, &[0x00]);
+        }
+
+        writer.buffer().to_vec()
     }
-}
-
-struct ElfFileInfo {
-    pub program_table_count: u8,
-    pub code_size: u64,
-    pub section_names_size: u64,
-    pub section_table_count: u8,
-}
-
-fn write_elf_header_1<T>(writer: &mut T, file_info: &ElfFileInfo) -> DynoResult<()>
-where
-    T: Write,
-{
-    // ELF magic number
-    write(writer, &[0x7F, 0x45, 0x4C, 0x46])?;
-
-    // 32 (0x01)  or 64 (0x02) bit
-    write(writer, &[0x02])?;
-
-    // little or big endianness
-    write(writer, &[0x01])?;
-
-    // one for current ELF version
-    write(writer, &[0x01])?;
-
-    // target os
-    write(writer, &[0x00])?;
-
-    // abi and pad
-    write(writer, &[0x00; 8])?;
-
-    const PROGRAM_TABLE_ENTRY_SIZE: u16 = 56;
-    let program_header_size = PROGRAM_TABLE_ENTRY_SIZE * file_info.program_table_count as u16;
-
-    const SECTION_TABLE_ENTRY_SIZE: u16 = 64;
-    let section_header_size = SECTION_TABLE_ENTRY_SIZE * file_info.section_table_count as u16;
-
-    // elf type
-    let elf_type = ElfType::EtExec;
-    write(writer, &(elf_type as u16).to_le_bytes())?;
-
-    // machine
-    write(writer, &(0x3e as u16).to_le_bytes())?;
-
-    // version
-    write(writer, &(0x01 as u32).to_le_bytes())?;
-
-    // entry
-    write(writer, &(0x400080 as u64).to_le_bytes())?;
-    // program header offset
-    write(writer, &(0x40 as u64).to_le_bytes())?;
-
-    // section table offset
-    write(
-        writer,
-        &(0x40 + program_header_size as u64 + file_info.code_size + file_info.section_names_size)
-            .to_le_bytes(),
-    )?;
-
-    // flags
-    write(writer, &(0x0 as u32).to_le_bytes())?;
-
-    // header size
-    write(writer, &(0x40 as u16).to_le_bytes())?;
-
-    // program header table size
-    write(writer, &PROGRAM_TABLE_ENTRY_SIZE.to_le_bytes())?;
-
-    // program header entry num
-    write(
-        writer,
-        &(file_info.program_table_count as u16).to_le_bytes(),
-    )?;
-
-    // section header entry size
-    write(writer, &SECTION_TABLE_ENTRY_SIZE.to_le_bytes())?;
-
-    // section header entry num
-    write(
-        writer,
-        &(file_info.section_table_count as u16).to_le_bytes(),
-    )?;
-
-    // section name header table entry
-    write(writer, &(0x02 as u16).to_le_bytes())?;
-
-    Ok(())
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -135,34 +60,6 @@ pub struct ElfProgramHeaderEntry {
     pub align: u64,
 }
 
-fn write_elf_program_header<T>(
-    writer: &mut T,
-    programs: &Vec<ElfProgramHeaderEntry>,
-) -> DynoResult<()>
-where
-    T: Write,
-{
-    for program in programs {
-        write(writer, &(program.segment_type as u32).to_le_bytes())?;
-
-        write(writer, &program.flags.to_le_bytes())?;
-
-        write(writer, &program.offset.to_le_bytes())?;
-
-        write(writer, &program.virtual_address.to_le_bytes())?;
-
-        write(writer, &program.physical_address.to_le_bytes())?;
-
-        write(writer, &program.file_size.to_le_bytes())?;
-
-        write(writer, &program.memory_size.to_le_bytes())?;
-
-        write(writer, &program.align.to_le_bytes())?;
-    }
-
-    Ok(())
-}
-
 #[derive(Debug, Copy, Clone)]
 pub enum ElfSectionType {
     ShtNull = 0x00,
@@ -187,7 +84,7 @@ pub enum ElfSectionType {
 }
 
 pub struct ElfSectionHeaderEntry {
-    pub name: u32,
+    pub name: String,
     pub section_type: ElfSectionType,
     pub flags: u64,
     pub address: u64,
@@ -199,8 +96,125 @@ pub struct ElfSectionHeaderEntry {
     pub entry_size: u64,
 }
 
+fn write(writer: &mut dyn Write, data: &[u8]) -> DynoResult<()> {
+    match writer.write(data) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(DynoError::ElfWriteError()),
+    }
+}
+
+fn write_elf_header_1<T>(writer: &mut T, file_info: &ElfFileInfo) -> DynoResult<()>
+where
+    T: Write,
+{
+    // ELF magic number
+    write(writer, &[0x7F, 0x45, 0x4C, 0x46])?;
+
+    // 32 (0x01)  or 64 (0x02) bit
+    write(writer, &[0x02])?;
+
+    // little or big endianness
+    write(writer, &[0x01])?;
+
+    // one for current ELF version
+    write(writer, &[0x01])?;
+
+    // target os
+    write(writer, &[0x00])?;
+
+    // abi and pad
+    write(writer, &[0x00; 8])?;
+
+    const PROGRAM_TABLE_ENTRY_SIZE: u16 = 56;
+    let program_header_size =
+        PROGRAM_TABLE_ENTRY_SIZE * file_info.program_header_table.len() as u16;
+
+    const SECTION_TABLE_ENTRY_SIZE: u16 = 64;
+    let section_header_size =
+        SECTION_TABLE_ENTRY_SIZE * file_info.section_header_table.len() as u16;
+
+    // elf type
+    let elf_type = ElfType::EtExec;
+    write(writer, &(elf_type as u16).to_le_bytes())?;
+
+    // machine
+    write(writer, &(0x3e as u16).to_le_bytes())?;
+
+    // version
+    write(writer, &(0x01 as u32).to_le_bytes())?;
+
+    // entry
+    write(writer, &(0x400080 as u64).to_le_bytes())?;
+    // program header offset
+    write(writer, &(0x40 as u64).to_le_bytes())?;
+
+    // section table offset
+    write(
+        writer,
+        &(0x40
+            + program_header_size as u64
+            + file_info.code.len() as u64
+            + file_info.get_names().len() as u64)
+            .to_le_bytes(),
+    )?;
+
+    // flags
+    write(writer, &(0x0 as u32).to_le_bytes())?;
+
+    // header size
+    write(writer, &(0x40 as u16).to_le_bytes())?;
+
+    // program header table size
+    write(writer, &PROGRAM_TABLE_ENTRY_SIZE.to_le_bytes())?;
+
+    // program header entry num
+    write(
+        writer,
+        &(file_info.program_header_table.len() as u16).to_le_bytes(),
+    )?;
+
+    // section header entry size
+    write(writer, &SECTION_TABLE_ENTRY_SIZE.to_le_bytes())?;
+
+    // section header entry num
+    write(
+        writer,
+        &(file_info.section_header_table.len() as u16).to_le_bytes(),
+    )?;
+
+    // section name header table entry
+    write(writer, &(0x02 as u16).to_le_bytes())?;
+
+    Ok(())
+}
+
+fn write_elf_program_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
+where
+    T: Write,
+{
+    for program in &elf_file.program_header_table {
+        write(writer, &(program.segment_type as u32).to_le_bytes())?;
+
+        write(writer, &program.flags.to_le_bytes())?;
+
+        write(writer, &program.offset.to_le_bytes())?;
+
+        write(writer, &program.virtual_address.to_le_bytes())?;
+
+        write(writer, &program.physical_address.to_le_bytes())?;
+
+        write(writer, &program.file_size.to_le_bytes())?;
+
+        write(writer, &program.memory_size.to_le_bytes())?;
+
+        write(writer, &program.align.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
 pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
-    name: 0,
+    name: String::new(),
     section_type: ElfSectionType::ShtNull,
     flags: 0,
     address: 0,
@@ -212,15 +226,13 @@ pub const NULL_SECTION: ElfSectionHeaderEntry = ElfSectionHeaderEntry {
     entry_size: 0,
 };
 
-fn write_elf_section_header<T>(
-    writer: &mut T,
-    sections: &Vec<ElfSectionHeaderEntry>,
-) -> DynoResult<()>
+fn write_elf_section_header<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
-    for section in sections {
-        write(writer, &section.name.to_le_bytes())?;
+    for section in &elf_file.section_header_table {
+        let name_index: u32 = 0;
+        write(writer, &name_index.to_le_bytes())?;
 
         write(writer, &(section.section_type as u32).to_le_bytes())?;
 
@@ -244,36 +256,20 @@ where
     Ok(())
 }
 
-pub fn write_elf_file<T>(
-    writer: &mut T,
-    program_header: &Vec<ElfProgramHeaderEntry>,
-    section_header: &Vec<ElfSectionHeaderEntry>,
-    code: &[u8],
-) -> DynoResult<()>
+pub fn write_elf_file<T>(writer: &mut T, elf_file: &ElfFileInfo) -> DynoResult<()>
 where
     T: Write,
 {
-    let names_data = &[
-        0x00, 0x2E, 0x73, 0x68, 0x73, 0x72, 0x74, 0x61, 0x62, 0x00, 0x2E, 0x74, 0x65, 0x78, 0x74,
-    ];
-
-    let file_info = ElfFileInfo {
-        program_table_count: program_header.len() as u8,
-        code_size: code.len() as u64,
-        section_names_size: names_data.len() as u64,
-        section_table_count: section_header.len() as u8,
-    };
-
-    write_elf_header_1(writer, &file_info)?;
-    write_elf_program_header(writer, program_header)?;
+    write_elf_header_1(writer, elf_file)?;
+    write_elf_program_header(writer, elf_file)?;
 
     write(writer, &[0; 8])?;
 
-    write(writer, code)?;
+    write(writer, &elf_file.code)?;
 
-    write(writer, names_data)?;
+    write(writer, &elf_file.get_names())?;
 
-    write_elf_section_header(writer, section_header)?;
+    write_elf_section_header(writer, elf_file)?;
 
     Ok(())
 }

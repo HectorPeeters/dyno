@@ -8,9 +8,9 @@ mod types;
 
 fn main() -> error::DynoResult<()> {
     let mut writer = std::fs::File::create("test.out").unwrap();
-    elf::write_elf_file(
-        &mut writer,
-        &vec![elf::ElfProgramHeaderEntry {
+
+    let elf_file = elf::ElfFileInfo {
+        program_header_table: vec![elf::ElfProgramHeaderEntry {
             segment_type: elf::ElfProgramHeaderEntryType::PtLoad,
             flags: 0x05,
             offset: 0x00,
@@ -20,10 +20,10 @@ fn main() -> error::DynoResult<()> {
             memory_size: 0x8C,
             align: 0x200000,
         }],
-        &vec![
+        section_header_table: vec![
             elf::NULL_SECTION,
             elf::ElfSectionHeaderEntry {
-                name: 10,
+                name: ".text".to_string(),
                 section_type: elf::ElfSectionType::ShtProgBits,
                 flags: 0x06,
                 address: 0x400080,
@@ -35,7 +35,7 @@ fn main() -> error::DynoResult<()> {
                 entry_size: 0x00,
             },
             elf::ElfSectionHeaderEntry {
-                name: 1,
+                name: ".shstrtab".to_string(),
                 section_type: elf::ElfSectionType::ShtStrTab,
                 flags: 0x00,
                 address: 0x00,
@@ -47,10 +47,12 @@ fn main() -> error::DynoResult<()> {
                 entry_size: 0x00,
             },
         ],
-        &[
+        code: vec![
             0xB8, 0x01, 0x00, 0x00, 0x00, 0xBB, 0x2A, 0x00, 0x00, 0x00, 0xCD, 0x80,
         ],
-    )?;
+    };
+
+    elf::write_elf_file(&mut writer, &elf_file)?;
 
     Ok(())
 }

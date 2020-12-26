@@ -1,6 +1,6 @@
 use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
-use crate::lexer::{lex, Token, TokenType};
+use crate::lexer::{Token, TokenType};
 
 struct Parser {
     tokens: Vec<Token>,
