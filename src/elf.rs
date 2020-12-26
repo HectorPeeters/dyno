@@ -64,6 +64,10 @@ pub enum ElfProgramHeaderEntryType {
     PtHiProc = 0x7FFFFFFF,
 }
 
+pub const ELF_PROGRAM_FLAG_EXECUTE: u32 = 0x01;
+pub const ELF_PROGRAM_FLAG_WRITE: u32 = 0x02;
+pub const ELF_PROGRAM_FLAG_READ: u32 = 0x04;
+
 pub struct ElfProgramHeaderEntry {
     pub segment_type: ElfProgramHeaderEntryType,
     pub flags: u32,
@@ -98,9 +102,19 @@ pub enum ElfSectionType {
     ShtLoos = 0x60000000,
 }
 
-pub const ELF_PROGRAM_FLAG_EXECUTE: u32 = 1;
-pub const ELF_PROGRAM_FLAG_WRITE: u32 = 2;
-pub const ELF_PROGRAM_FLAG_READ: u32 = 4;
+pub const ELF_SECTION_FLAG_WRITE: u64 = 0x01;
+pub const ELF_SECTION_FLAG_ALLOC: u64 = 0x02;
+pub const ELF_SECTION_FLAG_EXECINSTR: u64 = 0x04;
+pub const ELF_SECTION_FLAG_MERGE: u64 = 0x10;
+pub const ELF_SECTION_FLAG_STRINGS: u64 = 0x20;
+pub const ELF_SECTION_FLAG_INFO_LINK: u64 = 0x40;
+pub const ELF_SECTION_FLAG_OS_NONCONFORMING: u64 = 0x100;
+pub const ELF_SECTION_FLAG_GROUP: u64 = 0x200;
+pub const ELF_SECTION_FLAG_TLS: u64 = 0x400;
+pub const ELF_SECTION_FLAG_MASKOS: u64 = 0x0FF00000;
+pub const ELF_SECTION_FLAG_MASKPROC: u64 = 0xF0000000;
+pub const ELF_SECTION_FLAG_ORDERED: u64 = 0x40000000;
+pub const ELF_SECTION_FLAG_EXCLUDE: u64 = 0x80000000;
 
 pub struct ElfSectionHeaderEntry {
     pub name: String,

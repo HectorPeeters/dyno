@@ -25,7 +25,7 @@ fn main() -> error::DynoResult<()> {
             elf::ElfSectionHeaderEntry {
                 name: ".text".to_string(),
                 section_type: elf::ElfSectionType::ShtProgBits,
-                flags: 0x06,
+                flags: elf::ELF_SECTION_FLAG_ALLOC | elf::ELF_SECTION_FLAG_EXECINSTR,
                 address: 0x400080,
                 offset: 0x80,
                 size: 0x0C,
