@@ -9,6 +9,7 @@ pub enum DynoError {
     IntegerParseError(String),
     UnexpectedTokenError(TokenType, Vec<TokenType>),
     IncompatibleTypeError(DynoType, DynoType),
+    ElfWriteError(),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
