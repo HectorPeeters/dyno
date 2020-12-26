@@ -1,21 +1,14 @@
 mod ast;
+mod elf;
 mod error;
+mod generator;
 mod lexer;
 mod parser;
 mod types;
-mod generator;
-mod elf;
 
 fn main() -> error::DynoResult<()> {
-    let tokens = lexer::lex("12 + 9")?;
-
-    println!("Tokens:");
-    for token in &tokens {
-        println!("{:?}", token);
-    }
-
-    println!("\nAst:");
-    println!("{:#?}", parser::parse(tokens)?);
+    let mut writer = std::fs::File::create("test.out").unwrap();
+    elf::write_elf_file(&mut writer, &vec![], &vec![elf::NULL_SECTION], &[]);
 
     Ok(())
 }
