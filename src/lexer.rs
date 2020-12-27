@@ -25,6 +25,11 @@ pub enum TokenType {
     #[regex(r"/")]
     Slash,
 
+    #[regex(r"\(")]
+    LeftParen,
+    #[regex(r"\)")]
+    RightParen,
+
     #[error]
     Error,
 
