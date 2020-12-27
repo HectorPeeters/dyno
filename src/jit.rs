@@ -6,16 +6,17 @@ const PAGE_SIZE: usize = 4096;
 
 type FnPtr = extern "C" fn() -> u64;
 
-struct JitMemory {
+struct Jit {
     addr: *mut u8,
     raw_addr: *mut libc::c_void,
     size: usize,
     offset: usize,
 }
 
-impl JitMemory {
+impl Jit {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    pub fn new(num_pages: usize) -> JitMemory {
+    pub fn new(instructions: &[u8]) -> Jit {
+        let num_pages = (instructions.len() as f32 / PAGE_SIZE as f32).ceil() as usize;
         let size: usize = num_pages * PAGE_SIZE;
         let addr: *mut u8;
         let mut raw_addr: *mut libc::c_void;
@@ -37,12 +38,16 @@ impl JitMemory {
             addr = mem::transmute(raw_addr);
         }
 
-        JitMemory {
+        let mut jit = Jit {
             addr: addr,
             raw_addr: raw_addr,
             size: size,
             offset: 0,
-        }
+        };
+
+        jit.write_instructions(instructions);
+
+        jit
     }
 
     fn mark_writable(&self) {
@@ -73,7 +78,7 @@ impl JitMemory {
         result
     }
 
-    pub fn fill(&mut self, instructions: &[u8]) {
+    fn write_instructions(&mut self, instructions: &[u8]) {
         for byte in instructions {
             unsafe { *self.addr.offset(self.offset as _) = *byte };
             self.offset += 1;
@@ -81,7 +86,7 @@ impl JitMemory {
     }
 }
 
-impl Drop for JitMemory {
+impl Drop for Jit {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     fn drop(&mut self) {
         unsafe {
@@ -90,39 +95,20 @@ impl Drop for JitMemory {
     }
 }
 
-pub struct Jit {
-    ast: AstNode,
-    memory: JitMemory,
-}
-
-impl Jit {
-    pub fn new(ast: AstNode) -> Self {
-        Self {
-            ast,
-            memory: JitMemory::new(1),
-        }
-    }
-
-    pub fn execute(&self) {
-        self.memory.run();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::generator::gen_assembly;
     use crate::lexer::lex;
     use crate::parser::parse;
 
-    fn get_ast() -> AstNode {
-        parse(lex("1 + 2 - 5").unwrap()).unwrap()
+    fn get_asm(input: &str) -> Vec<u8> {
+        gen_assembly(parse(lex(input).unwrap()).unwrap()).unwrap()
     }
 
     #[test]
     fn jit_new() {
-        let ast = get_ast();
-
-        let _ = Jit::new(ast);
+        let _ = Jit::new(&get_asm("1 + 3"));
     }
 
     #[test]
@@ -135,8 +121,7 @@ mod tests {
             0xc3, //    retq
         ];
 
-        let mut memory = JitMemory::new(1);
-        memory.fill(&code);
+        let mut memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
     }
 }
