@@ -197,15 +197,15 @@ where
     write(writer, &(elf_type as u16).to_le_bytes())?;
 
     // machine
-    write(writer, &(0x3e as u16).to_le_bytes())?;
+    write(writer, &(0x3e_u16).to_le_bytes())?;
 
     // version
-    write(writer, &(0x01 as u32).to_le_bytes())?;
+    write(writer, &(0x01_u32).to_le_bytes())?;
 
     // entry
-    write(writer, &(0x400080 as u64).to_le_bytes())?;
+    write(writer, &(0x400080_u64).to_le_bytes())?;
     // program header offset
-    write(writer, &(0x40 as u64).to_le_bytes())?;
+    write(writer, &(0x40_u64).to_le_bytes())?;
 
     // section table offset
     write(
@@ -219,10 +219,10 @@ where
     )?;
 
     // flags
-    write(writer, &(0x0 as u32).to_le_bytes())?;
+    write(writer, &(0x0_u32).to_le_bytes())?;
 
     // header size
-    write(writer, &(0x40 as u16).to_le_bytes())?;
+    write(writer, &(0x40_u16).to_le_bytes())?;
 
     // program header table size
     write(writer, &PROGRAM_TABLE_ENTRY_SIZE.to_le_bytes())?;
@@ -243,7 +243,7 @@ where
     )?;
 
     // section name header table entry
-    write(writer, &(0x02 as u16).to_le_bytes())?;
+    write(writer, &(0x02_u16).to_le_bytes())?;
 
     Ok(())
 }

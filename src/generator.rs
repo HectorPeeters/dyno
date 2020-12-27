@@ -112,12 +112,12 @@ impl X86Generator {
     }
 
     fn write_u16(&mut self, data: u16) -> DynoResult<()> {
-        self.write(&[((data >> 0) & 0xFF) as u8, ((data >> 8) & 0xFF) as u8])
+        self.write(&[(data & 0xFF) as u8, ((data >> 8) & 0xFF) as u8])
     }
 
     fn write_u32(&mut self, data: u32) -> DynoResult<()> {
         self.write(&[
-            ((data >> 0) & 0xFF) as u8,
+            (data & 0xFF) as u8,
             ((data >> 8) & 0xFF) as u8,
             ((data >> 16) & 0xFF) as u8,
             ((data >> 24) & 0xFF) as u8,
@@ -126,7 +126,7 @@ impl X86Generator {
 
     fn write_u64(&mut self, data: u64) -> DynoResult<()> {
         self.write(&[
-            ((data >> 0) & 0xFF) as u8,
+            (data & 0xFF) as u8,
             ((data >> 8) & 0xFF) as u8,
             ((data >> 16) & 0xFF) as u8,
             ((data >> 24) & 0xFF) as u8,
