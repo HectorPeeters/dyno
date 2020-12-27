@@ -187,8 +187,8 @@ impl X86Generator {
         }
     }
 
-    fn write_cltd(&mut self) -> DynoResult<()> {
-        self.write(&[0x99])
+    fn write_cqto(&mut self) -> DynoResult<()> {
+        self.write(&[0x48, 0x99])
     }
 
     fn write_prologue(&mut self) -> DynoResult<()> {
@@ -222,7 +222,7 @@ impl X86Generator {
                     }
                     BinaryOperationType::Divide => {
                         self.write_movq_reg_reg(left_reg, Reg::Rax)?;
-                        self.write_cltd()?;
+                        self.write(&[0x99])?;
                         self.write_divq_reg(right_reg)?;
                         self.write_movq_reg_reg(Reg::Rax, left_reg)?;
                     }
