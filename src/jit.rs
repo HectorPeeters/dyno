@@ -143,4 +143,10 @@ mod tests {
         let jit = Jit::new(&get_asm("42 - 12"));
         assert_eq!(jit.run(), 30);
     }
+
+    #[test]
+    fn jit_execute_add_subtract_expression() {
+        let jit = Jit::new(&get_asm("42 - 12 + 12 - 5 + 2284"));
+        assert_eq!(jit.run(), 2321);
+    }
 }
