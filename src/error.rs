@@ -10,6 +10,7 @@ pub enum DynoError {
     UnexpectedTokenError(TokenType, Vec<TokenType>),
     IncompatibleTypeError(DynoType, DynoType),
     ElfWriteError(),
+    X86WriteError(),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
