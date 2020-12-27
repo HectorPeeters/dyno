@@ -1,4 +1,3 @@
-use libc;
 use std::mem;
 
 const PAGE_SIZE: usize = 4096;
@@ -34,13 +33,13 @@ impl Jit {
             libc::memset(raw_addr, 0xc3, size);
 
             // Transmute the c_void pointer to a Rust u8 pointer
-            addr = mem::transmute(raw_addr);
+            addr = raw_addr as *mut u8;
         }
 
         let mut jit = Jit {
-            addr: addr,
-            raw_addr: raw_addr,
-            size: size,
+            addr,
+            raw_addr,
+            size,
             offset: 0,
         };
 
@@ -62,7 +61,7 @@ impl Jit {
     }
 
     pub fn run(&self) -> u64 {
-        let mut result = 0;
+        let result;
 
         unsafe {
             self.mark_executable();
@@ -79,7 +78,7 @@ impl Jit {
 
     fn write_instructions(&mut self, instructions: &[u8]) {
         for byte in instructions {
-            unsafe { *self.addr.offset(self.offset as _) = *byte };
+            unsafe { *self.addr.add(self.offset) = *byte };
             self.offset += 1;
         }
     }
