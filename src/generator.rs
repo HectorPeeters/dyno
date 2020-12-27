@@ -1,4 +1,4 @@
-use crate::ast::AstNode;
+use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
 use std::io::BufWriter;
 use std::io::Write;
@@ -77,6 +77,7 @@ impl X86Generator {
         for i in 0..self.used_regs.len() {
             if !self.used_regs[i] {
                 self.used_regs[i] = true;
+                println!("Allocated reg: {:?}", Reg::from(i));
                 return Ok(Reg::from(i));
             }
         }
@@ -89,6 +90,7 @@ impl X86Generator {
         match self.used_regs[reg as usize] {
             true => {
                 self.used_regs[reg as usize] = false;
+                println!("Deallocated reg: {:?}", reg);
                 Ok(())
             }
             false => Err(DynoError::GeneratorError(format!(
@@ -99,7 +101,6 @@ impl X86Generator {
     }
 
     fn write(&mut self, data: &[u8]) -> DynoResult<()> {
-        print!("{:X?}", data);
         match self.writer.write(data) {
             Ok(_) => Ok(()),
             Err(_) => Err(DynoError::X86WriteError()),
@@ -154,6 +155,24 @@ impl X86Generator {
         }
     }
 
+    fn write_addq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
+        match (src.is_r(), dst.is_r()) {
+            (false, false) => self.write(&[0x48, 0x01, 0xC0 + (src as u8 * 8 + dst as u8)]),
+            (false, true) => self.write(&[0x49, 0x01, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
+            (true, false) => self.write(&[0x4c, 0x01, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
+            (true, true) => self.write(&[0x4d, 0x01, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
+        }
+    }
+
+    fn write_subq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
+        match (src.is_r(), dst.is_r()) {
+            (false, false) => self.write(&[0x48, 0x29, 0xC0 + (src as u8 * 8 + dst as u8)]),
+            (false, true) => self.write(&[0x49, 0x29, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
+            (true, false) => self.write(&[0x4c, 0x29, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
+            (true, true) => self.write(&[0x4d, 0x29, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
+        }
+    }
+
     fn write_prologue(&mut self) -> DynoResult<()> {
         self.write(&[0x55, 0x48, 0x89, 0xE5])
     }
@@ -168,6 +187,22 @@ impl X86Generator {
                 let reg = self.new_reg()?;
                 self.write_movq_imm_reg(*value as u64, reg)?;
                 Ok(reg)
+            }
+            AstNode::BinaryOperation(op_type, left, right) => {
+                let left_reg = self.gen_expression(left)?;
+                let right_reg = self.gen_expression(right)?;
+
+                match op_type {
+                    BinaryOperationType::Add => self.write_addq_reg_reg(right_reg, left_reg)?,
+                    BinaryOperationType::Subtract => {
+                        self.write_subq_reg_reg(right_reg, left_reg)?
+                    }
+                    _ => panic!(""),
+                }
+
+                self.free_reg(right_reg)?;
+
+                Ok(left_reg)
             }
             _ => Err(DynoError::GeneratorError(format!(
                 "Cannot gen expression for {:?}",

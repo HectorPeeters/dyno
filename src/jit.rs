@@ -102,7 +102,9 @@ mod tests {
     use crate::parser::parse;
 
     fn get_asm(input: &str) -> Vec<u8> {
-        gen_assembly(parse(lex(input).unwrap()).unwrap()).unwrap()
+        let asm = gen_assembly(parse(lex(input).unwrap()).unwrap()).unwrap();
+        println!("{:02x?}", asm);
+        asm
     }
 
     #[test]
@@ -128,5 +130,17 @@ mod tests {
     fn jit_execute_single_int() {
         let jit = Jit::new(&get_asm("42"));
         assert_eq!(jit.run(), 42);
+    }
+
+    #[test]
+    fn jit_execute_add_expression() {
+        let jit = Jit::new(&get_asm("42 + 12"));
+        assert_eq!(jit.run(), 54);
+    }
+
+    #[test]
+    fn jit_execute_subtract_expression() {
+        let jit = Jit::new(&get_asm("42 - 12"));
+        assert_eq!(jit.run(), 30);
     }
 }
