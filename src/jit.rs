@@ -1,4 +1,3 @@
-use crate::ast::AstNode;
 use libc;
 use std::mem;
 
@@ -6,7 +5,7 @@ const PAGE_SIZE: usize = 4096;
 
 type FnPtr = extern "C" fn() -> u64;
 
-struct Jit {
+pub struct Jit {
     addr: *mut u8,
     raw_addr: *mut libc::c_void,
     size: usize,
@@ -122,6 +121,12 @@ mod tests {
         ];
 
         let mut memory = Jit::new(&code);
+        assert_eq!(memory.run(), 0x37);
+    }
+
+    #[test]
+    fn jit_execute_generated_code() {
+        let mut memory = Jit::new(&get_asm(""));
         assert_eq!(memory.run(), 0x37);
     }
 }
