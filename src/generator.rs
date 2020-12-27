@@ -3,11 +3,6 @@ use crate::error::*;
 use std::io::BufWriter;
 use std::io::Write;
 
-struct X86Generator {
-    writer: BufWriter<Vec<u8>>,
-    ast: AstNode,
-}
-
 #[derive(Debug, Copy, Clone)]
 enum Reg {
     Rax = 0,
@@ -28,11 +23,25 @@ enum Reg {
     R15 = 15,
 }
 
+impl Reg {
+    fn is_r(self) -> bool {
+        match self {
+            Reg::R8 | Reg::R9 | Reg::R10 | Reg::R11 | Reg::R12 | Reg::R13 | Reg::R14 | Reg::R15 => {
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+struct X86Generator {
+    writer: BufWriter<Vec<u8>>,
+}
+
 impl X86Generator {
-    fn new(ast: AstNode) -> Self {
+    fn new() -> Self {
         Self {
             writer: BufWriter::new(vec![]),
-            ast,
         }
     }
 
@@ -73,13 +82,22 @@ impl X86Generator {
         ])
     }
 
-    fn write_movq_imm(&mut self, value: u64, reg: Reg) -> DynoResult<()> {
-        if (reg as u8) < (Reg::R8 as u8) {
-            self.write(&[0x48, 0xb8 + reg as u8])?;
+    fn write_movq_imm_reg(&mut self, value: u64, dst: Reg) -> DynoResult<()> {
+        if dst.is_r() {
+            self.write(&[0x49, 0xb8 + dst as u8])?;
         } else {
-            self.write(&[0x49, 0xb8 + reg as u8])?;
+            self.write(&[0x48, 0xb8 + dst as u8])?;
         }
         self.write_u64(value)
+    }
+
+    fn write_movq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
+        match (src.is_r(), dst.is_r()) {
+            (false, false) => self.write(&[0x48, 0x89, 0xC0 + (src as u8 * 8 + dst as u8)]),
+            (false, true) => self.write(&[0x49, 0x89, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
+            (true, false) => self.write(&[0x4c, 0x89, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
+            (true, true) => self.write(&[0x4d, 0x89, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
+        }
     }
 
     fn write_prologue(&mut self) -> DynoResult<()> {
@@ -90,9 +108,17 @@ impl X86Generator {
         self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])
     }
 
-    fn gen(&mut self) -> DynoResult<Vec<u8>> {
+    fn gen_expression(&mut self, ast: &AstNode) -> DynoResult<Reg> {
+        Ok(Reg::Rax)
+    }
+
+    fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
         self.write_prologue()?;
-        self.write_movq_imm(0x1234, Reg::Rax);
+
+        let reg = self.gen_expression(ast)?;
+
+        self.write_movq_reg_reg(reg, Reg::Rax)?;
+
         self.write_epilogue()?;
 
         Ok(self.writer.buffer().to_vec())
@@ -100,28 +126,22 @@ impl X86Generator {
 }
 
 pub fn gen_assembly(ast: AstNode) -> DynoResult<Vec<u8>> {
-    let mut generator = X86Generator::new(ast);
-    generator.gen()
+    let mut generator = X86Generator::new();
+    generator.gen(&ast)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::lex;
-    use crate::parser::parse;
-
-    fn get_generator(input: &str) -> X86Generator {
-        X86Generator::new(parse(lex(input).unwrap()).unwrap())
-    }
 
     #[test]
     fn generator_new() {
-        let _ = get_generator("1 + 12");
+        let _ = X86Generator::new();
     }
 
     #[test]
     fn generator_write_u8() {
-        let mut generator = get_generator("");
+        let mut generator = X86Generator::new();
 
         generator.write_u8(12).unwrap();
         assert_eq!(generator.writer.buffer(), &[12]);
@@ -129,7 +149,7 @@ mod tests {
 
     #[test]
     fn generator_write_u16() {
-        let mut generator = get_generator("");
+        let mut generator = X86Generator::new();
 
         generator.write_u16(0x1234).unwrap();
         assert_eq!(generator.writer.buffer(), &[0x34, 0x12]);
@@ -137,7 +157,7 @@ mod tests {
 
     #[test]
     fn generator_write_u32() {
-        let mut generator = get_generator("");
+        let mut generator = X86Generator::new();
 
         generator.write_u32(0x12345678).unwrap();
         assert_eq!(generator.writer.buffer(), &[0x78, 0x56, 0x34, 0x12]);
@@ -145,12 +165,24 @@ mod tests {
 
     #[test]
     fn generator_write_u64() {
-        let mut generator = get_generator("");
+        let mut generator = X86Generator::new();
 
         generator.write_u64(0x1234567812345678).unwrap();
         assert_eq!(
             generator.writer.buffer(),
             &[0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12]
         );
+    }
+
+    #[test]
+    fn generator_write_movq_reg_reg() {
+        let mut generator = X86Generator::new();
+
+        generator.write_movq_reg_reg(Reg::R15, Reg::R12).unwrap();
+        generator.write_movq_reg_reg(Reg::Rbx, Reg::R12).unwrap();
+        generator.write_movq_reg_reg(Reg::R13, Reg::Rsi).unwrap();
+        generator.write_movq_reg_reg(Reg::Rcx, Reg::Rdx).unwrap();
+
+        assert_eq!(generator.writer.buffer(), &[0x4D, 0x89, 0xFC, 0x49,0x89,0xDC,0x4C,0x89,0xEE,0x48,0x89,0xCA]);
     }
 }

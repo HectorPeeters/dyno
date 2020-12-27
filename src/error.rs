@@ -11,6 +11,7 @@ pub enum DynoError {
     IncompatibleTypeError(DynoType, DynoType),
     ElfWriteError(),
     X86WriteError(),
+    GeneratorError(String),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
