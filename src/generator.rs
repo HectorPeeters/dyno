@@ -3,7 +3,7 @@ use crate::error::*;
 use std::io::BufWriter;
 use std::io::Write;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum Reg {
     Rax = 0,
     Rcx = 1,
@@ -34,18 +34,72 @@ impl Reg {
     }
 }
 
+impl From<usize> for Reg {
+    fn from(x: usize) -> Reg {
+        use Reg::*;
+
+        match x {
+            0 => Rax,
+            1 => Rcx,
+            2 => Rdx,
+            3 => Rbx,
+            4 => Rsp,
+            5 => Rbp,
+            6 => Rsi,
+            7 => Rdi,
+            8 => R8,
+            9 => R9,
+            10 => R10,
+            11 => R11,
+            12 => R12,
+            13 => R13,
+            14 => R14,
+            15 => R15,
+            _ => unreachable!(),
+        }
+    }
+}
+
 struct X86Generator {
     writer: BufWriter<Vec<u8>>,
+    used_regs: Vec<bool>,
 }
 
 impl X86Generator {
     fn new() -> Self {
         Self {
             writer: BufWriter::new(vec![]),
+            used_regs: vec![false; 16],
+        }
+    }
+
+    fn new_reg(&mut self) -> DynoResult<Reg> {
+        for i in 0..self.used_regs.len() {
+            if !self.used_regs[i] {
+                self.used_regs[i] = true;
+                return Ok(Reg::from(i));
+            }
+        }
+        Err(DynoError::GeneratorError(
+            "Failed to allocate new register".to_string(),
+        ))
+    }
+
+    fn free_reg(&mut self, reg: Reg) -> DynoResult<()> {
+        match self.used_regs[reg as usize] {
+            true => {
+                self.used_regs[reg as usize] = false;
+                Ok(())
+            }
+            false => Err(DynoError::GeneratorError(format!(
+                "Trying to free reg which isn't used: {:?}",
+                reg
+            ))),
         }
     }
 
     fn write(&mut self, data: &[u8]) -> DynoResult<()> {
+        print!("{:X?}", data);
         match self.writer.write(data) {
             Ok(_) => Ok(()),
             Err(_) => Err(DynoError::X86WriteError()),
@@ -109,7 +163,17 @@ impl X86Generator {
     }
 
     fn gen_expression(&mut self, ast: &AstNode) -> DynoResult<Reg> {
-        Ok(Reg::Rax)
+        match ast {
+            AstNode::IntegerLiteral(value, _) => {
+                let reg = self.new_reg()?;
+                self.write_movq_imm_reg(*value as u64, reg)?;
+                Ok(reg)
+            }
+            _ => Err(DynoError::GeneratorError(format!(
+                "Cannot gen expression for {:?}",
+                ast
+            ))),
+        }
     }
 
     fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
@@ -183,6 +247,14 @@ mod tests {
         generator.write_movq_reg_reg(Reg::R13, Reg::Rsi).unwrap();
         generator.write_movq_reg_reg(Reg::Rcx, Reg::Rdx).unwrap();
 
-        assert_eq!(generator.writer.buffer(), &[0x4D, 0x89, 0xFC, 0x49,0x89,0xDC,0x4C,0x89,0xEE,0x48,0x89,0xCA]);
+        assert_eq!(
+            generator.writer.buffer(),
+            &[0x4D, 0x89, 0xFC, 0x49, 0x89, 0xDC, 0x4C, 0x89, 0xEE, 0x48, 0x89, 0xCA]
+        );
+    }
+
+    #[test]
+    fn generator_write_single_int_literal() {
+        gen_assembly(AstNode::IntegerLiteral(1234, 8)).unwrap();
     }
 }

@@ -126,19 +126,9 @@ impl Parser {
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
     let mut parser = Parser::new(input);
 
-    let mut nodes: Vec<AstNode> = vec![];
+    let node = parser.parse_expression(0)?;
 
-    loop {
-        if parser.is_eof() {
-            break;
-        }
-
-        let node = parser.parse_expression(0)?;
-
-        nodes.push(node);
-    }
-
-    Ok(AstNode::Block(nodes))
+    Ok(node)
 }
 
 #[cfg(test)]
@@ -192,11 +182,11 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Block(vec![AstNode::BinaryOperation(
+            AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::IntegerLiteral(12, 4)),
                 Box::new(AstNode::IntegerLiteral(4, 3)),
-            )])
+            )
         );
     }
 
@@ -206,7 +196,7 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Block(vec![AstNode::BinaryOperation(
+            AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::IntegerLiteral(12, 4)),
                 Box::new(AstNode::BinaryOperation(
@@ -214,7 +204,7 @@ mod tests {
                     Box::new(AstNode::IntegerLiteral(4, 3)),
                     Box::new(AstNode::IntegerLiteral(7, 3)),
                 )),
-            )])
+            )
         );
     }
 
@@ -224,7 +214,7 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Block(vec![AstNode::BinaryOperation(
+            AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::BinaryOperation(
                     Multiply,
@@ -232,7 +222,7 @@ mod tests {
                     Box::new(AstNode::IntegerLiteral(4, 3)),
                 )),
                 Box::new(AstNode::IntegerLiteral(7, 3)),
-            )])
+            )
         );
     }
 

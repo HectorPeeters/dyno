@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn jit_new() {
-        let _ = Jit::new(&get_asm("1 + 3"));
+        let _ = Jit::new(&get_asm("12"));
     }
 
     #[test]
@@ -122,5 +122,11 @@ mod tests {
 
         let mut memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
+    }
+
+    #[test]
+    fn jit_execute_single_int() {
+        let jit = Jit::new(&get_asm("42"));
+        assert_eq!(jit.run(), 42);
     }
 }
