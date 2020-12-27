@@ -354,7 +354,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_elf_write() {
+    fn elf_write_full_file() {
         let mut writer = std::io::BufWriter::new(vec![]);
 
         let elf_file = ElfFileInfo {
