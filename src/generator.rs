@@ -77,7 +77,6 @@ impl X86Generator {
         for i in 0..self.used_regs.len() {
             if !self.used_regs[i] {
                 self.used_regs[i] = true;
-                println!("Allocated reg: {:?}", Reg::from(i));
                 return Ok(Reg::from(i));
             }
         }
@@ -90,7 +89,6 @@ impl X86Generator {
         match self.used_regs[reg as usize] {
             true => {
                 self.used_regs[reg as usize] = false;
-                println!("Deallocated reg: {:?}", reg);
                 Ok(())
             }
             false => Err(DynoError::GeneratorError(format!(
