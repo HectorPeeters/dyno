@@ -8,6 +8,26 @@ struct X86Generator {
     ast: AstNode,
 }
 
+#[derive(Debug, Copy, Clone)]
+enum Reg {
+    Rax = 0,
+    Rcx = 1,
+    Rdx = 2,
+    Rbx = 3,
+    Rsp = 4,
+    Rbp = 5,
+    Rsi = 6,
+    Rdi = 7,
+    R8 = 8,
+    R9 = 9,
+    R10 = 10,
+    R11 = 11,
+    R12 = 12,
+    R13 = 13,
+    R14 = 14,
+    R15 = 15,
+}
+
 impl X86Generator {
     fn new(ast: AstNode) -> Self {
         Self {
@@ -53,23 +73,28 @@ impl X86Generator {
         ])
     }
 
+    fn write_movq_imm(&mut self, value: u64, reg: Reg) -> DynoResult<()> {
+        if (reg as u8) < (Reg::R8 as u8) {
+            self.write(&[0x48, 0xb8 + reg as u8])?;
+        } else {
+            self.write(&[0x49, 0xb8 + reg as u8])?;
+        }
+        self.write_u64(value)
+    }
+
     fn write_prologue(&mut self) -> DynoResult<()> {
-        self.write(&[0x55, 0x48, 0x89, 0xE5])?;
-        Ok(())
+        self.write(&[0x55, 0x48, 0x89, 0xE5])
     }
 
     fn write_epilogue(&mut self) -> DynoResult<()> {
-        self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])?;
-        Ok(())
+        self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])
     }
 
     fn gen(&mut self) -> DynoResult<Vec<u8>> {
         self.write_prologue()?;
-        self.write_u8(0xB8)?;
-        self.write_u32(0x37)?;
+        self.write_movq_imm(0x1234, Reg::Rax);
         self.write_epilogue()?;
 
-        println!("{:?}", self.writer.buffer());
         Ok(self.writer.buffer().to_vec())
     }
 }

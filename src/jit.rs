@@ -123,10 +123,4 @@ mod tests {
         let mut memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
     }
-
-    #[test]
-    fn jit_execute_generated_code() {
-        let mut memory = Jit::new(&get_asm(""));
-        assert_eq!(memory.run(), 0x37);
-    }
 }
