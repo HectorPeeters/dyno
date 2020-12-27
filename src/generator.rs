@@ -139,7 +139,7 @@ impl X86Generator {
 
     fn write_movq_imm_reg(&mut self, value: u64, dst: Reg) -> DynoResult<()> {
         if dst.is_r() {
-            self.write(&[0x49, 0xb8 + dst as u8])?;
+            self.write(&[0x49, 0xb8 + (dst as u8 - 8)])?;
         } else {
             self.write(&[0x48, 0xb8 + dst as u8])?;
         }
