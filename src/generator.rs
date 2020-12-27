@@ -65,7 +65,11 @@ impl X86Generator {
 
     fn gen(&mut self) -> DynoResult<Vec<u8>> {
         self.write_prologue();
+        self.write_u8(0xB8);
+        self.write_u32(0x37);
         self.write_epilogue();
+
+        println!("{:?}", self.writer.buffer());
         Ok(self.writer.buffer().to_vec())
     }
 }
