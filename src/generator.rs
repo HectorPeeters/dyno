@@ -65,11 +65,13 @@ struct X86Generator {
     used_regs: Vec<bool>,
 }
 
+const EXPRESSION_REGISTER_OFFSET: usize = 1;
+
 impl X86Generator {
     fn new() -> Self {
         Self {
             writer: BufWriter::new(vec![]),
-            used_regs: vec![false; 16],
+            used_regs: vec![false; 3],
         }
     }
 
@@ -77,7 +79,7 @@ impl X86Generator {
         for i in 0..self.used_regs.len() {
             if !self.used_regs[i] {
                 self.used_regs[i] = true;
-                return Ok(Reg::from(i));
+                return Ok(Reg::from(i + EXPRESSION_REGISTER_OFFSET));
             }
         }
         Err(DynoError::GeneratorError(
@@ -86,9 +88,9 @@ impl X86Generator {
     }
 
     fn free_reg(&mut self, reg: Reg) -> DynoResult<()> {
-        match self.used_regs[reg as usize] {
+        match self.used_regs[reg as usize - EXPRESSION_REGISTER_OFFSET] {
             true => {
-                self.used_regs[reg as usize] = false;
+                self.used_regs[reg as usize - EXPRESSION_REGISTER_OFFSET] = false;
                 Ok(())
             }
             false => Err(DynoError::GeneratorError(format!(
@@ -171,6 +173,13 @@ impl X86Generator {
         }
     }
 
+    fn write_mulq_reg(&mut self, src: Reg) -> DynoResult<()> {
+        match src.is_r() {
+            false => self.write(&[0x48, 0xF7, 0xE0 + src as u8]),
+            true => self.write(&[0x49, 0xF7, 0xE0 + (src as u8 - 8)]),
+        }
+    }
+
     fn write_prologue(&mut self) -> DynoResult<()> {
         self.write(&[0x55, 0x48, 0x89, 0xE5])
     }
@@ -195,7 +204,12 @@ impl X86Generator {
                     BinaryOperationType::Subtract => {
                         self.write_subq_reg_reg(right_reg, left_reg)?
                     }
-                    _ => panic!(""),
+                    BinaryOperationType::Multiply => {
+                                              self.write_movq_reg_reg(right_reg, Reg::Rax)?;
+                        self.write_mulq_reg(left_reg)?;
+                                                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+                    }
+                    _ => panic!("Unsupported binary operation"),
                 }
 
                 self.free_reg(right_reg)?;

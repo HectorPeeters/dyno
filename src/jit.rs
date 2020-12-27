@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn jit_execute_code() {
-        let mut code: Vec<u8> = vec![
+        let code: Vec<u8> = vec![
             0x55, //    push   %rbp
             0x48, 0x89, 0xe5, //    mov    %rsp,%rbp
             0xb8, 0x37, 0x00, 0x00, 0x00, //    mov    $0x37,%eax
@@ -122,7 +122,7 @@ mod tests {
             0xc3, //    retq
         ];
 
-        let mut memory = Jit::new(&code);
+        let memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
     }
 
@@ -148,5 +148,11 @@ mod tests {
     fn jit_execute_add_subtract_expression() {
         let jit = Jit::new(&get_asm("42 - 12 + 12 - 5 + 2284"));
         assert_eq!(jit.run(), 2321);
+    }
+
+    #[test]
+    fn jit_execute_multiply_expression() {
+        let jit = Jit::new(&get_asm("2 * 4 * 3"));
+                assert_eq!(jit.run(), 24);
     }
 }
