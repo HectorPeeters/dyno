@@ -59,15 +59,15 @@ impl X86Generator {
     }
 
     fn write_epilogue(&mut self) -> DynoResult<()> {
-        self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3]);
+        self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])?;
         Ok(())
     }
 
     fn gen(&mut self) -> DynoResult<Vec<u8>> {
-        self.write_prologue();
-        self.write_u8(0xB8);
-        self.write_u32(0x37);
-        self.write_epilogue();
+        self.write_prologue()?;
+        self.write_u8(0xB8)?;
+        self.write_u32(0x37)?;
+        self.write_epilogue()?;
 
         println!("{:?}", self.writer.buffer());
         Ok(self.writer.buffer().to_vec())
