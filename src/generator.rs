@@ -65,7 +65,7 @@ struct X86Generator {
     used_regs: Vec<bool>,
 }
 
-const EXPRESSION_REGISTER_OFFSET: usize = 1;
+const EXPRESSION_REGISTER_OFFSET: usize = 6;
 
 impl X86Generator {
     fn new() -> Self {
@@ -180,6 +180,17 @@ impl X86Generator {
         }
     }
 
+    fn write_divq_reg(&mut self, src: Reg) -> DynoResult<()> {
+        match src.is_r() {
+            false => self.write(&[0x48, 0xF7, 0xf0 + src as u8]),
+            true => self.write(&[0x49, 0xF7, 0xf0 + (src as u8 - 8)]),
+        }
+    }
+
+    fn write_cltd(&mut self) -> DynoResult<()> {
+        self.write(&[0x99])
+    }
+
     fn write_prologue(&mut self) -> DynoResult<()> {
         self.write(&[0x55, 0x48, 0x89, 0xE5])
     }
@@ -205,11 +216,16 @@ impl X86Generator {
                         self.write_subq_reg_reg(right_reg, left_reg)?
                     }
                     BinaryOperationType::Multiply => {
-                                              self.write_movq_reg_reg(right_reg, Reg::Rax)?;
+                        self.write_movq_reg_reg(right_reg, Reg::Rax)?;
                         self.write_mulq_reg(left_reg)?;
-                                                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+                        self.write_movq_reg_reg(Reg::Rax, left_reg)?;
                     }
-                    _ => panic!("Unsupported binary operation"),
+                    BinaryOperationType::Divide => {
+                        self.write_movq_reg_reg(left_reg, Reg::Rax)?;
+                        self.write_cltd()?;
+                        self.write_divq_reg(right_reg)?;
+                        self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+                    }
                 }
 
                 self.free_reg(right_reg)?;

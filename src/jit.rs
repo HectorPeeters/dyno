@@ -153,6 +153,12 @@ mod tests {
     #[test]
     fn jit_execute_multiply_expression() {
         let jit = Jit::new(&get_asm("2 * 4 * 3"));
-                assert_eq!(jit.run(), 24);
+        assert_eq!(jit.run(), 24);
+    }
+
+    #[test]
+    fn jit_execute_divide_expression() {
+        let jit = Jit::new(&get_asm("16 / 4 / 2"));
+        assert_eq!(jit.run(), 2);
     }
 }
