@@ -28,6 +28,9 @@ pub enum TokenType {
     #[regex(r"=")]
     Equals,
 
+    #[regex(r";")]
+    SemiColon,
+
     #[regex(r"\(")]
     LeftParen,
     #[regex(r"\)")]

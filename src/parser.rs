@@ -88,11 +88,13 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
+        let delimeters = vec![TokenType::Eof, TokenType::SemiColon];
+
         let mut left = self.parse_unary_expression()?;
 
         let mut operator = self.peek()?;
 
-        if operator.token_type == TokenType::Eof {
+        if delimeters.contains(&operator.token_type) {
             return Ok(left);
         }
 
@@ -111,7 +113,7 @@ impl Parser {
 
             operator = self.peek()?;
 
-            if operator.token_type == TokenType::Eof {
+            if delimeters.contains(&operator.token_type) {
                 return Ok(left);
             }
 
@@ -121,12 +123,25 @@ impl Parser {
 
         Ok(left)
     }
+
+    fn parse_assignment(&mut self) -> DynoResult<AstNode> {
+        self.consume_expect(TokenType::Let)?;
+        let variable_name = self.consume_expect(TokenType::Identifier)?.value.clone();
+        self.consume_expect(TokenType::Equals)?;
+
+        let expression = self.parse_expression(0)?;
+
+        Ok(AstNode::Assignment(variable_name, Box::new(expression)))
+    }
 }
 
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
     let mut parser = Parser::new(input);
 
-    let node = parser.parse_expression(0)?;
+    let node = match parser.peek()?.token_type {
+        TokenType::Let => parser.parse_assignment(),
+        _ => parser.parse_expression(0),
+    }?;
 
     Ok(node)
 }
@@ -210,7 +225,7 @@ mod tests {
 
     #[test]
     fn parser_precendence_b() {
-        let ast = parse(lex("12 * 4 + 7").unwrap()).unwrap();
+        let ast = parse(lex("12 * 4 + 7;").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -223,6 +238,26 @@ mod tests {
                 )),
                 Box::new(AstNode::IntegerLiteral(7, 3)),
             )
+        );
+    }
+
+    #[test]
+    fn parser_simple_assignment() {
+        let ast = parse(lex("let a = 12;").unwrap()).unwrap();
+
+        assert_eq!(
+            ast,
+            AstNode::Assignment("a".to_string(), Box::new(AstNode::IntegerLiteral(12, 4)))
+        );
+    }
+
+    #[test]
+    fn parser_complex_assignment() {
+        let ast = parse(lex("let a = 12 - 2 * 4;").unwrap()).unwrap();
+
+        assert_eq!(
+            ast,
+            AstNode::Assignment("a".to_string(), Box::new(AstNode::BinaryOperation(BinaryOperationType::Subtract,Box::new(AstNode::IntegerLiteral(12, 4)), Box::new(AstNode::BinaryOperation(BinaryOperationType::Multiply, Box::new(AstNode::IntegerLiteral(2, 2)), Box::new(AstNode::IntegerLiteral(4, 3)))))))
         );
     }
 
