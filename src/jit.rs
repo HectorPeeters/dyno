@@ -160,4 +160,10 @@ mod tests {
         let jit = Jit::new(&get_asm("16 / 4 / 2"));
         assert_eq!(jit.run(), 2);
     }
+
+    #[test]
+    fn jit_execute_complete_expression() {
+        let jit = Jit::new(&get_asm("12 / 3 + 7 * 8 - 10 / 2 * 4"));
+        assert_eq!(jit.run(), 40);
+    }
 }
