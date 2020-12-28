@@ -88,7 +88,7 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
-        let delimeters = vec![TokenType::Eof, TokenType::SemiColon];
+        let delimeters = vec![TokenType::SemiColon, TokenType::Eof];
 
         let mut left = self.parse_unary_expression()?;
 
@@ -131,6 +131,8 @@ impl Parser {
 
         let expression = self.parse_expression(0)?;
 
+        self.consume_expect(TokenType::SemiColon)?;
+
         Ok(AstNode::Assignment(variable_name, Box::new(expression)))
     }
 }
@@ -140,7 +142,11 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     let node = match parser.peek()?.token_type {
         TokenType::Let => parser.parse_assignment(),
-        _ => parser.parse_expression(0),
+        _ => {
+            let node = parser.parse_expression(0);
+            parser.consume_expect(TokenType::SemiColon)?;
+            node
+        }
     }?;
 
     Ok(node)
@@ -193,7 +199,7 @@ mod tests {
 
     #[test]
     fn parser_basic_binary_op() {
-        let ast = parse(lex("12 + 4").unwrap()).unwrap();
+        let ast = parse(lex("12 + 4;").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -207,7 +213,7 @@ mod tests {
 
     #[test]
     fn parser_precendence_a() {
-        let ast = parse(lex("12 + 4 * 7").unwrap()).unwrap();
+        let ast = parse(lex("12 + 4 * 7;").unwrap()).unwrap();
 
         assert_eq!(
             ast,
@@ -257,7 +263,18 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Assignment("a".to_string(), Box::new(AstNode::BinaryOperation(BinaryOperationType::Subtract,Box::new(AstNode::IntegerLiteral(12, 4)), Box::new(AstNode::BinaryOperation(BinaryOperationType::Multiply, Box::new(AstNode::IntegerLiteral(2, 2)), Box::new(AstNode::IntegerLiteral(4, 3)))))))
+            AstNode::Assignment(
+                "a".to_string(),
+                Box::new(AstNode::BinaryOperation(
+                    BinaryOperationType::Subtract,
+                    Box::new(AstNode::IntegerLiteral(12, 4)),
+                    Box::new(AstNode::BinaryOperation(
+                        BinaryOperationType::Multiply,
+                        Box::new(AstNode::IntegerLiteral(2, 2)),
+                        Box::new(AstNode::IntegerLiteral(4, 3))
+                    ))
+                ))
+            )
         );
     }
 

@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn jit_new() {
-        let _ = Jit::new(&get_asm("12"));
+        let _ = Jit::new(&get_asm("12;"));
     }
 
     #[test]
@@ -127,43 +127,43 @@ mod tests {
 
     #[test]
     fn jit_execute_single_int() {
-        let jit = Jit::new(&get_asm("42"));
+        let jit = Jit::new(&get_asm("42;"));
         assert_eq!(jit.run(), 42);
     }
 
     #[test]
     fn jit_execute_add_expression() {
-        let jit = Jit::new(&get_asm("42 + 12"));
+        let jit = Jit::new(&get_asm("42 + 12;"));
         assert_eq!(jit.run(), 54);
     }
 
     #[test]
     fn jit_execute_subtract_expression() {
-        let jit = Jit::new(&get_asm("42 - 12"));
+        let jit = Jit::new(&get_asm("42 - 12;"));
         assert_eq!(jit.run(), 30);
     }
 
     #[test]
     fn jit_execute_add_subtract_expression() {
-        let jit = Jit::new(&get_asm("42 - 12 + 12 - 5 + 2284"));
+        let jit = Jit::new(&get_asm("42 - 12 + 12 - 5 + 2284;"));
         assert_eq!(jit.run(), 2321);
     }
 
     #[test]
     fn jit_execute_multiply_expression() {
-        let jit = Jit::new(&get_asm("2 * 4 * 3"));
+        let jit = Jit::new(&get_asm("2 * 4 * 3;"));
         assert_eq!(jit.run(), 24);
     }
 
     #[test]
     fn jit_execute_divide_expression() {
-        let jit = Jit::new(&get_asm("16 / 4 / 2"));
+        let jit = Jit::new(&get_asm("16 / 4 / 2;"));
         assert_eq!(jit.run(), 2);
     }
 
     #[test]
     fn jit_execute_complete_expression() {
-        let jit = Jit::new(&get_asm("12 / 3 + 7 * 8 - 10 / 2 * 4"));
+        let jit = Jit::new(&get_asm("12 / 3 + 7 * 8 - 10 / 2 * 4;"));
         assert_eq!(jit.run(), 40);
     }
 }
