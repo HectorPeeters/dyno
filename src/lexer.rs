@@ -57,6 +57,13 @@ impl PartialEq for Token {
     }
 }
 
+impl PartialEq<TokenType> for &Token {
+    fn eq(&self, other: &TokenType) -> bool {
+        self.token_type == *other
+    }
+}
+
+
 impl Token {
     pub fn new(token_type: TokenType, value: &str) -> Self {
         Self {

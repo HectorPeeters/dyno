@@ -41,7 +41,7 @@ impl Parser {
     fn consume_expect(&mut self, expected: TokenType) -> DynoResult<&Token> {
         let token = self.consume()?;
 
-        if token.token_type != expected {
+        if token != expected {
             return Err(DynoError::UnexpectedTokenError(
                 token.token_type,
                 vec![expected],
@@ -52,7 +52,7 @@ impl Parser {
     }
 
     fn is_eof(&self) -> bool {
-        self.index >= self.tokens.len() || self.tokens[self.index].token_type == TokenType::Eof
+        self.index >= self.tokens.len() || &self.tokens[self.index] == TokenType::Eof
     }
 
     fn get_bit_count(value: u128) -> u8 {
@@ -164,13 +164,10 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
         nodes.push(node);
     }
 
-    match nodes.len() {
-        1 => {
-            let node = nodes.remove(0);
-            Ok(node)
-        }
-        _ => Ok(AstNode::Block(nodes)),
-    }
+    Ok(match nodes.len() {
+        1 => nodes.remove(0),
+        _ => AstNode::Block(nodes),
+    })
 }
 
 #[cfg(test)]
@@ -195,10 +192,10 @@ mod tests {
             Token::with_type(Minus),
         ]);
 
-        assert_eq!(parser.peek().unwrap().token_type, Plus);
-        assert_eq!(parser.peek_next(0).unwrap().token_type, Plus);
-        assert_eq!(parser.peek_next(1).unwrap().token_type, Whitespace);
-        assert_eq!(parser.peek_next(2).unwrap().token_type, Minus);
+        assert_eq!(parser.peek().unwrap(), Plus);
+        assert_eq!(parser.peek_next(0).unwrap(), Plus);
+        assert_eq!(parser.peek_next(1).unwrap(), Whitespace);
+        assert_eq!(parser.peek_next(2).unwrap(), Minus);
 
         assert!(parser.peek_next(3).is_err());
     }
@@ -211,9 +208,9 @@ mod tests {
             Token::with_type(Minus),
         ]);
 
-        assert_eq!(parser.consume().unwrap().token_type, Plus);
-        assert_eq!(parser.consume().unwrap().token_type, Whitespace);
-        assert_eq!(parser.consume().unwrap().token_type, Minus);
+        assert_eq!(parser.consume().unwrap(), Plus);
+        assert_eq!(parser.consume().unwrap(), Whitespace);
+        assert_eq!(parser.consume().unwrap(), Minus);
 
         assert!(parser.consume().is_err());
     }
