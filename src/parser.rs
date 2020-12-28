@@ -52,7 +52,7 @@ impl Parser {
     }
 
     fn is_eof(&self) -> bool {
-        self.index >= self.tokens.len() || &self.tokens[self.index] == TokenType::Eof
+        self.index >= self.tokens.len()
     }
 
     fn get_bit_count(value: u128) -> u8 {
@@ -88,7 +88,7 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
-        let delimeters = vec![TokenType::SemiColon, TokenType::Eof];
+        let delimeters = vec![TokenType::SemiColon];
 
         let mut left = self.parse_unary_expression()?;
 
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn parser_peek_next_out_of_bounds_error() {
-        let parser = Parser::new(vec![Token::with_type(Eof)]);
+        let parser = Parser::new(vec![Token::with_type(SemiColon)]);
         let token = parser.peek_next(1);
 
         assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
@@ -322,12 +322,15 @@ mod tests {
 
     #[test]
     fn parser_consume_expect_error() {
-        let mut parser = Parser::new(vec![Token::with_type(Eof)]);
+        let mut parser = Parser::new(vec![Token::with_type(SemiColon)]);
         let token = parser.consume_expect(IntegerLiteral);
 
         assert_eq!(
             token,
-            Err(DynoError::UnexpectedTokenError(Eof, vec![IntegerLiteral]))
+            Err(DynoError::UnexpectedTokenError(
+                SemiColon,
+                vec![IntegerLiteral]
+            ))
         );
     }
 

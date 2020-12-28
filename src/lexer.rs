@@ -40,8 +40,6 @@ pub enum TokenType {
 
     #[error]
     Error,
-
-    Eof,
 }
 
 #[derive(Debug)]
@@ -62,7 +60,6 @@ impl PartialEq<TokenType> for &Token {
         self.token_type == *other
     }
 }
-
 
 impl Token {
     pub fn new(token_type: TokenType, value: &str) -> Self {
@@ -91,34 +88,12 @@ impl Token {
 }
 
 pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
-    let mut lex = TokenType::lexer(input);
-
-    let mut tokens: Vec<Token> = vec![];
-
-    loop {
-        let token_type = lex.next();
-
-        if token_type.is_none() {
-            break;
-        }
-
-        let token_type = token_type.unwrap();
-
-        match token_type {
-            TokenType::Error => {
-                return Err(DynoError::LexerError(lex.slice().to_string(), lex.span()));
-            }
-            TokenType::Whitespace => {}
-            _ => {
-                let token = Token::new_with_span(token_type, lex.slice(), lex.span());
-                tokens.push(token);
-            }
-        }
-    }
-
-    tokens.push(Token::with_type(TokenType::Eof));
-
-    Ok(tokens)
+    TokenType::lexer(input).spanned().filter(|t| t.0 != TokenType::Whitespace)
+        .map(|t| match t.0 {
+            TokenType::Error => Err(DynoError::LexerError(input[t.1.clone()].to_string(), t.1)),
+            _ => Ok(Token::new_with_span(t.0, &input[t.1.clone()], t.1)),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -135,8 +110,7 @@ mod tests {
     #[test]
     fn lexer_empty() {
         let tokens = get_tokens("");
-        assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens[0].token_type, Eof);
+        assert_eq!(tokens.len(), 0);
     }
 
     #[test]
@@ -147,7 +121,6 @@ mod tests {
         assert_eq!(tokens[1], Token::new(IntegerLiteral, "0"));
         assert_eq!(tokens[2], Token::new(IntegerLiteral, "439394474"));
         assert_eq!(tokens[3], Token::new(IntegerLiteral, "123"));
-        assert_eq!(tokens[4].token_type, Eof);
     }
 
     #[test]
@@ -158,16 +131,16 @@ mod tests {
         assert_eq!(tokens[1].token_type, Minus);
         assert_eq!(tokens[2].token_type, Asterix);
         assert_eq!(tokens[3].token_type, Slash);
-        assert_eq!(tokens[4].token_type, Eof);
     }
+
     #[test]
     fn lexer_test_error() {
-        let tokens = lex("&");
+        let tokens = lex("return &;");
 
         assert!(tokens.is_err());
         assert_eq!(
             tokens.err().unwrap(),
-            DynoError::LexerError("&".to_string(), 0..1)
+            DynoError::LexerError("&".to_string(), 7..8)
         );
     }
 }
