@@ -9,6 +9,7 @@ mod lexer;
 mod parser;
 mod types;
 
+use std::env;
 use std::io::{stdin, stdout, Write};
 
 fn read_input() -> String {
@@ -26,6 +27,8 @@ fn read_input() -> String {
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
     loop {
         let input = read_input();
 
@@ -36,6 +39,11 @@ fn main() {
         }
         let tokens = tokens.unwrap();
 
+        if args.contains(&"--lex".to_string()) {
+            println!("\nTokens:");
+            println!("{:#?}", tokens);
+        }
+
         let ast = parser::parse(tokens);
         if ast.is_err() {
             eprintln!("Failed to create ast: {}", ast.err().unwrap());
@@ -43,7 +51,10 @@ fn main() {
         }
         let ast = ast.unwrap();
 
-        println!("{:#?}", ast);
+        if args.contains(&"--ast".to_string()) {
+            println!("\nAst:");
+            println!("{:#?}", ast);
+        }
 
         let assembly = generator::gen_assembly(ast);
         if assembly.is_err() {
@@ -52,7 +63,11 @@ fn main() {
         }
         let assembly = assembly.unwrap();
 
-        println!("Generated {} bytes of assembly", assembly.len());
+        if args.contains(&"--cg".to_string()) {
+            println!("\nCode gen ({} bytes): ", assembly.len());
+            println!("{:02X?}\n", assembly);
+        }
+
         let jit = jit::Jit::new(&assembly);
         let result = jit.run();
         println!("=> {}", result);
