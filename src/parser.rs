@@ -150,7 +150,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     let mut nodes: Vec<AstNode> = vec![];
 
-    while parser.peek()?.token_type != TokenType::Eof {
+    while !parser.is_eof() {
         let node = match parser.peek()?.token_type {
             TokenType::Let => parser.parse_assignment(),
             TokenType::Return => parser.parse_return_statement(),
@@ -164,7 +164,13 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
         nodes.push(node);
     }
 
-    Ok(AstNode::Block(nodes))
+    match nodes.len() {
+        1 => {
+            let node = nodes.remove(0);
+            Ok(node)
+        }
+        _ => Ok(AstNode::Block(nodes)),
+    }
 }
 
 #[cfg(test)]
