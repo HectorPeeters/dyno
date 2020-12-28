@@ -50,6 +50,7 @@ fn main() {
         }
         let assembly = assembly.unwrap();
 
+        println!("Generated {} bytes of assembly", assembly.len());
         let jit = jit::Jit::new(&assembly);
         let result = jit.run();
         println!("=> {}", result);

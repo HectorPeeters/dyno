@@ -7,8 +7,8 @@ pub enum TokenType {
     #[regex(r"[ \t\n\f]+")]
     Whitespace,
 
-    #[regex(r"if")]
-    If,
+    #[regex(r"let")]
+    Let,
 
     #[regex(r"[a-zA-Z]+")]
     Identifier,
@@ -24,6 +24,9 @@ pub enum TokenType {
     Asterix,
     #[regex(r"/")]
     Slash,
+
+    #[regex(r"=")]
+    Equals,
 
     #[regex(r"\(")]
     LeftParen,
