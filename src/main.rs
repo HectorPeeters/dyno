@@ -31,21 +31,21 @@ fn main() {
 
         let tokens = lexer::lex(&input);
         if tokens.is_err() {
-            eprintln!("Failed to tokenize input: {:?}", tokens.err());
+            eprintln!("Failed to tokenize input: {}", tokens.err().unwrap());
             continue;
         }
         let tokens = tokens.unwrap();
 
         let ast = parser::parse(tokens);
         if ast.is_err() {
-            eprintln!("Failed to create ast: {:?}", ast.err());
+            eprintln!("Failed to create ast: {}", ast.err().unwrap());
             continue;
         }
         let ast = ast.unwrap();
 
         let assembly = generator::gen_assembly(ast);
         if assembly.is_err() {
-            eprintln!("Failed to generate assembly: {:?}", assembly.err());
+            eprintln!("Failed to generate assembly: {}", assembly.err().unwrap());
             continue;
         }
         let assembly = assembly.unwrap();
