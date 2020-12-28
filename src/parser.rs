@@ -148,17 +148,23 @@ impl Parser {
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
     let mut parser = Parser::new(input);
 
-    let node = match parser.peek()?.token_type {
-        TokenType::Let => parser.parse_assignment(),
-        TokenType::Return => parser.parse_return_statement(),
-        _ => {
-            let node = parser.parse_expression(0);
-            parser.consume_expect(TokenType::SemiColon)?;
-            node
-        }
-    }?;
+    let mut nodes: Vec<AstNode> = vec![];
 
-    Ok(node)
+    while parser.peek()?.token_type != TokenType::Eof {
+        let node = match parser.peek()?.token_type {
+            TokenType::Let => parser.parse_assignment(),
+            TokenType::Return => parser.parse_return_statement(),
+            _ => {
+                let node = parser.parse_expression(0);
+                parser.consume_expect(TokenType::SemiColon)?;
+                node
+            }
+        }?;
+
+        nodes.push(node);
+    }
+
+    Ok(AstNode::Block(nodes))
 }
 
 #[cfg(test)]

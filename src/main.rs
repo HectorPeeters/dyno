@@ -43,6 +43,8 @@ fn main() {
         }
         let ast = ast.unwrap();
 
+        println!("{:#?}", ast);
+
         let assembly = generator::gen_assembly(ast);
         if assembly.is_err() {
             eprintln!("Failed to generate assembly: {}", assembly.err().unwrap());

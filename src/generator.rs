@@ -239,22 +239,33 @@ impl X86Generator {
         }
     }
 
-    fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
-        self.write_prologue()?;
-
-        match ast {
+    fn gen_single_node(&mut self, node: &AstNode) -> DynoResult<()> {
+        match node {
             AstNode::Return(expression) => {
                 let reg = self.gen_expression(expression)?;
                 self.write_movq_reg_reg(reg, Reg::Rax)?;
                 self.write_epilogue()?;
             }
+            AstNode::Block(nodes) => {
+                for node in nodes {
+                    self.gen_single_node(node)?;
+                }
+            }
             _ => {
                 return Err(DynoError::GeneratorError(format!(
                     "Cannot generate code for {:?}",
-                    ast,
+                    node,
                 )))
             }
         }
+
+        Ok(())
+    }
+
+    fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
+        self.write_prologue()?;
+
+        self.gen_single_node(ast)?;
 
         Ok(self.writer.buffer().to_vec())
     }
