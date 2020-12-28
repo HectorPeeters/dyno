@@ -242,11 +242,19 @@ impl X86Generator {
     fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
         self.write_prologue()?;
 
-        let reg = self.gen_expression(ast)?;
-
-        self.write_movq_reg_reg(reg, Reg::Rax)?;
-
-        self.write_epilogue()?;
+        match ast {
+            AstNode::Return(expression) => {
+                let reg = self.gen_expression(expression)?;
+                self.write_movq_reg_reg(reg, Reg::Rax)?;
+                self.write_epilogue()?;
+            }
+            _ => {
+                return Err(DynoError::GeneratorError(format!(
+                    "Cannot generate code for {:?}",
+                    ast,
+                )))
+            }
+        }
 
         Ok(self.writer.buffer().to_vec())
     }
@@ -318,6 +326,6 @@ mod tests {
 
     #[test]
     fn generator_write_single_int_literal() {
-        gen_assembly(AstNode::IntegerLiteral(1234, 8)).unwrap();
+        gen_assembly(AstNode::Return(Box::new(AstNode::IntegerLiteral(1234, 8)))).unwrap();
     }
 }

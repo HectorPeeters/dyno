@@ -15,6 +15,7 @@ pub enum AstNode {
     BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
     IntegerLiteral(u128, u8),
     Assignment(String, Box<AstNode>),
+    Return(Box<AstNode>),
     Block(Vec<AstNode>),
 }
 

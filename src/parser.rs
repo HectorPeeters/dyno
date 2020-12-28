@@ -135,6 +135,14 @@ impl Parser {
 
         Ok(AstNode::Assignment(variable_name, Box::new(expression)))
     }
+
+    fn parse_return_statement(&mut self) -> DynoResult<AstNode> {
+        self.consume_expect(TokenType::Return)?;
+        let expression = self.parse_expression(0)?;
+        self.consume_expect(TokenType::SemiColon)?;
+
+        Ok(AstNode::Return(Box::new(expression)))
+    }
 }
 
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
@@ -142,6 +150,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     let node = match parser.peek()?.token_type {
         TokenType::Let => parser.parse_assignment(),
+        TokenType::Return => parser.parse_return_statement(),
         _ => {
             let node = parser.parse_expression(0);
             parser.consume_expect(TokenType::SemiColon)?;

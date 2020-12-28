@@ -9,6 +9,8 @@ pub enum TokenType {
 
     #[regex(r"let")]
     Let,
+    #[regex(r"return")]
+    Return,
 
     #[regex(r"[a-zA-Z]+")]
     Identifier,
