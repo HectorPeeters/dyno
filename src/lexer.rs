@@ -88,7 +88,9 @@ impl Token {
 }
 
 pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
-    TokenType::lexer(input).spanned().filter(|t| t.0 != TokenType::Whitespace)
+    TokenType::lexer(input)
+        .spanned()
+        .filter(|t| t.0 != TokenType::Whitespace)
         .map(|t| match t.0 {
             TokenType::Error => Err(DynoError::LexerError(input[t.1.clone()].to_string(), t.1)),
             _ => Ok(Token::new_with_span(t.0, &input[t.1.clone()], t.1)),

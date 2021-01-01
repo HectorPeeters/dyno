@@ -124,7 +124,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_assignment(&mut self) -> DynoResult<AstNode> {
+    fn parse_declaration(&mut self) -> DynoResult<AstNode> {
         self.consume_expect(TokenType::Let)?;
         let variable_name = self.consume_expect(TokenType::Identifier)?.value.clone();
         self.consume_expect(TokenType::Equals)?;
@@ -152,7 +152,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     while !parser.is_eof() {
         let node = match parser.peek()?.token_type {
-            TokenType::Let => parser.parse_assignment(),
+            TokenType::Let => parser.parse_declaration(),
             TokenType::Return => parser.parse_return_statement(),
             _ => {
                 let node = parser.parse_expression(0);
