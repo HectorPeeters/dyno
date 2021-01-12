@@ -63,15 +63,15 @@ impl Jit {
     pub fn run(&self) -> u64 {
         let result;
 
-        unsafe {
-            self.mark_executable();
+        self.mark_executable();
 
+        unsafe {
             let fn_ptr: FnPtr = mem::transmute(self.addr);
 
             result = fn_ptr();
-
-            self.mark_writable();
         }
+
+        self.mark_writable();
 
         result
     }
