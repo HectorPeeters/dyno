@@ -32,6 +32,13 @@ impl Reg {
             _ => false,
         }
     }
+    fn get_r_adapted_value(self) -> u8 {
+        if self.is_r() {
+            self as u8 - 8
+        } else {
+            self as u8
+        }
+    }
 }
 
 impl From<usize> for Reg {
@@ -147,30 +154,45 @@ impl X86Generator {
     }
 
     fn write_movq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        match (src.is_r(), dst.is_r()) {
-            (false, false) => self.write(&[0x48, 0x89, 0xC0 + (src as u8 * 8 + dst as u8)]),
-            (false, true) => self.write(&[0x49, 0x89, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
-            (true, false) => self.write(&[0x4c, 0x89, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
-            (true, true) => self.write(&[0x4d, 0x89, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
-        }
+        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
+            (false, false) => 0x48,
+            (false, true) => 0x49,
+            (true, false) => 0x4c,
+            (true, true) => 0x4d,
+        };
+        self.write(&[
+            instr_byte_1,
+            0x89,
+            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
+        ])
     }
 
     fn write_addq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        match (src.is_r(), dst.is_r()) {
-            (false, false) => self.write(&[0x48, 0x01, 0xC0 + (src as u8 * 8 + dst as u8)]),
-            (false, true) => self.write(&[0x49, 0x01, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
-            (true, false) => self.write(&[0x4c, 0x01, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
-            (true, true) => self.write(&[0x4d, 0x01, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
-        }
+        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
+            (false, false) => 0x48,
+            (false, true) => 0x49,
+            (true, false) => 0x4c,
+            (true, true) => 0x4d,
+        };
+        self.write(&[
+            instr_byte_1,
+            0x01,
+            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
+        ])
     }
 
     fn write_subq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        match (src.is_r(), dst.is_r()) {
-            (false, false) => self.write(&[0x48, 0x29, 0xC0 + (src as u8 * 8 + dst as u8)]),
-            (false, true) => self.write(&[0x49, 0x29, 0xC0 + (src as u8 * 8 + dst as u8 - 8)]),
-            (true, false) => self.write(&[0x4c, 0x29, 0xC0 + ((src as u8 - 8) * 8 + dst as u8)]),
-            (true, true) => self.write(&[0x4d, 0x29, 0xC0 + ((src as u8 - 8) * 8 + dst as u8 - 8)]),
-        }
+        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
+            (false, false) => 0x48,
+            (false, true) => 0x49,
+            (true, false) => 0x4c,
+            (true, true) => 0x4d,
+        };
+        self.write(&[
+            instr_byte_1,
+            0x29,
+            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
+        ])
     }
 
     fn write_mulq_reg(&mut self, src: Reg) -> DynoResult<()> {
