@@ -43,29 +43,29 @@ pub enum TokenType {
 }
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'a> {
     pub token_type: TokenType,
-    pub value: String,
+    pub value: &'a str,
     pub span: Range<usize>,
 }
 
-impl PartialEq for Token {
+impl PartialEq for Token<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.token_type == other.token_type && self.value == other.value
     }
 }
 
-impl PartialEq<TokenType> for &Token {
+impl PartialEq<TokenType> for &Token<'_> {
     fn eq(&self, other: &TokenType) -> bool {
         self.token_type == *other
     }
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, value: &str) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, value: &'a str) -> Self {
         Self {
             token_type,
-            value: value.to_string(),
+            value,
             span: 0..0,
         }
     }
@@ -73,22 +73,24 @@ impl Token {
     pub fn with_type(token_type: TokenType) -> Self {
         Self {
             token_type,
-            value: String::default(),
+            value: "",
             span: 0..0,
         }
     }
 
-    pub fn new_with_span(token_type: TokenType, value: &str, span: Range<usize>) -> Self {
+    pub fn new_with_span(token_type: TokenType, value: &'a str, span: Range<usize>) -> Self {
         Self {
             token_type,
-            value: value.to_string(),
+            value,
             span,
         }
     }
 }
 
 pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
-    TokenType::lexer(input).spanned().filter(|t| t.0 != TokenType::Whitespace)
+    TokenType::lexer(input)
+        .spanned()
+        .filter(|t| t.0 != TokenType::Whitespace)
         .map(|t| match t.0 {
             TokenType::Error => Err(DynoError::LexerError(input[t.1.clone()].to_string(), t.1)),
             _ => Ok(Token::new_with_span(t.0, &input[t.1.clone()], t.1)),

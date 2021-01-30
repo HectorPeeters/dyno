@@ -2,13 +2,13 @@ use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
 use crate::lexer::{Token, TokenType};
 
-struct Parser {
-    tokens: Vec<Token>,
+struct Parser<'a> {
+    tokens: Vec<Token<'a>>,
     index: usize,
 }
 
-impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
+impl<'a> Parser<'a> {
+    fn new(tokens: Vec<Token<'a>>) -> Self {
         Self { tokens, index: 0 }
     }
 
@@ -38,7 +38,7 @@ impl Parser {
         Ok(result)
     }
 
-    fn consume_expect(&mut self, expected: TokenType) -> DynoResult<&Token> {
+    fn consume_expect(&mut self, expected: TokenType) -> DynoResult<&'a Token> {
         let token = self.consume()?;
 
         if token != expected {
@@ -62,7 +62,7 @@ impl Parser {
         bits as u8 + 1
     }
 
-    fn parse_integer_literal(&mut self) -> DynoResult<AstNode> {
+    fn parse_integer_literal(&'a mut self) -> DynoResult<AstNode<'a>> {
         let token = self.consume_expect(TokenType::IntegerLiteral)?;
 
         let value: Result<u128, _> = token.value.parse();
@@ -71,11 +71,11 @@ impl Parser {
                 let bits = Parser::get_bit_count(x);
                 Ok(AstNode::IntegerLiteral(x, bits))
             }
-            Err(_) => Err(DynoError::IntegerParseError(token.value.clone())),
+            Err(_) => Err(DynoError::IntegerParseError(token.value.to_string())),
         }
     }
 
-    fn parse_unary_expression(&mut self) -> DynoResult<AstNode> {
+    fn parse_unary_expression(&'a mut self) -> DynoResult<AstNode<'a>> {
         let next = self.peek()?;
 
         match next.token_type {
@@ -87,62 +87,60 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
+    fn parse_expression(&'a mut self, precendence: u8) -> DynoResult<AstNode<'a>> {
         let delimeters = vec![TokenType::SemiColon];
 
-        let mut left = self.parse_unary_expression()?;
+        let mut left: AstNode<'a> = self.parse_unary_expression()?;
 
-        let mut operator = self.peek()?;
+//        let mut operator = self.peek()?;
+//
+//        if delimeters.contains(&operator.token_type) {
+//            return Ok(left);
+//        }
 
-        if delimeters.contains(&operator.token_type) {
-            return Ok(left);
-        }
+        //   let mut operator_type = BinaryOperationType::from_token_type(operator.token_type)?;
+        //   let mut current_precendence = operator_type.get_precedence();
 
-        let mut operator_type = BinaryOperationType::from_token_type(operator.token_type)?;
-        let mut current_precendence = operator_type.get_precedence();
+        //   while current_precendence > precendence {
+        //       let token_type = operator.token_type;
+        //       self.consume_expect(token_type)?;
 
-        while current_precendence > precendence {
-            let token_type = operator.token_type;
-            self.consume_expect(token_type)?;
+        //       let right = self.parse_expression(current_precendence)?;
 
-            let right = self.parse_expression(current_precendence)?;
+        //       //TODO: do type checking here
 
-            //TODO: do type checking here
+        //       left = AstNode::BinaryOperation(operator_type, Box::new(left), Box::new(right));
 
-            left = AstNode::BinaryOperation(operator_type, Box::new(left), Box::new(right));
+        //       operator = self.peek()?;
+        //       if delimeters.contains(&operator.token_type) {
+        //           return Ok(left);
+        //       }
 
-            operator = self.peek()?;
-
-            if delimeters.contains(&operator.token_type) {
-                return Ok(left);
-            }
-
-            operator_type = BinaryOperationType::from_token_type(operator.token_type)?;
-            current_precendence = operator_type.get_precedence();
-        }
+        //       operator_type = BinaryOperationType::from_token_type(operator.token_type)?;
+        //       current_precendence = operator_type.get_precedence();
+        //   }
 
         Ok(left)
     }
-
-    fn parse_assignment(&mut self) -> DynoResult<AstNode> {
-        self.consume_expect(TokenType::Let)?;
-        let variable_name = self.consume_expect(TokenType::Identifier)?.value.clone();
-        self.consume_expect(TokenType::Equals)?;
-
-        let expression = self.parse_expression(0)?;
-
-        self.consume_expect(TokenType::SemiColon)?;
-
-        Ok(AstNode::Assignment(variable_name, Box::new(expression)))
-    }
-
-    fn parse_return_statement(&mut self) -> DynoResult<AstNode> {
-        self.consume_expect(TokenType::Return)?;
-        let expression = self.parse_expression(0)?;
-        self.consume_expect(TokenType::SemiColon)?;
-
-        Ok(AstNode::Return(Box::new(expression)))
-    }
+    //    fn parse_assignment(&mut self) -> DynoResult<AstNode<'a>> {
+    //        self.consume_expect(TokenType::Let)?;
+    //        let variable_name = self.consume_expect(TokenType::Identifier)?.value;
+    //        self.consume_expect(TokenType::Equals)?;
+    //
+    //        let expression = self.parse_expression(0)?;
+    //
+    //        self.consume_expect(TokenType::SemiColon)?;
+    //
+    //        Ok(AstNode::Assignment(variable_name, Box::new(expression)))
+    //    }
+    //
+    //    fn parse_return_statement(&mut self) -> DynoResult<AstNode<'a>> {
+    //        self.consume_expect(TokenType::Return)?;
+    //        let expression = self.parse_expression(0)?;
+    //        self.consume_expect(TokenType::SemiColon)?;
+    //
+    //        Ok(AstNode::Return(Box::new(expression)))
+    //    }
 }
 
 pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
@@ -150,19 +148,19 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     let mut nodes: Vec<AstNode> = vec![];
 
-    while !parser.is_eof() {
-        let node = match parser.peek()?.token_type {
-            TokenType::Let => parser.parse_assignment(),
-            TokenType::Return => parser.parse_return_statement(),
-            _ => {
-                let node = parser.parse_expression(0);
-                parser.consume_expect(TokenType::SemiColon)?;
-                node
-            }
-        }?;
-
-        nodes.push(node);
-    }
+    //    while !parser.is_eof() {
+    //        let node = match parser.peek()?.token_type {
+    //            TokenType::Let => parser.parse_assignment(),
+    //            TokenType::Return => parser.parse_return_statement(),
+    //            _ => {
+    //                let node = parser.parse_expression(0);
+    //                parser.consume_expect(TokenType::SemiColon)?;
+    //                node
+    //            }
+    //        }?;
+    //
+    //        nodes.push(node);
+    //    }
 
     Ok(match nodes.len() {
         1 => nodes.remove(0),
@@ -271,7 +269,7 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Assignment("a".to_string(), Box::new(AstNode::IntegerLiteral(12, 4)))
+            AstNode::Assignment("a", Box::new(AstNode::IntegerLiteral(12, 4)))
         );
     }
 
@@ -282,7 +280,7 @@ mod tests {
         assert_eq!(
             ast,
             AstNode::Assignment(
-                "a".to_string(),
+                "a",
                 Box::new(AstNode::BinaryOperation(
                     BinaryOperationType::Subtract,
                     Box::new(AstNode::IntegerLiteral(12, 4)),

@@ -11,12 +11,12 @@ pub enum BinaryOperationType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AstNode {
-    BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
+pub enum AstNode<'a> {
+    BinaryOperation(BinaryOperationType, Box<AstNode<'a>>, Box<AstNode<'a>>),
     IntegerLiteral(u128, u8),
-    Assignment(String, Box<AstNode>),
-    Return(Box<AstNode>),
-    Block(Vec<AstNode>),
+    Assignment(&'a str, Box<AstNode<'a>>),
+    Return(Box<AstNode<'a>>),
+    Block(Vec<AstNode<'a>>),
 }
 
 impl BinaryOperationType {
@@ -52,7 +52,7 @@ impl BinaryOperationType {
     }
 }
 
-impl AstNode {
+impl AstNode<'_> {
     fn get_type(&self) -> DynoResult<DynoType> {
         match self {
             AstNode::BinaryOperation(_, left, right) => {
