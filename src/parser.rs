@@ -88,13 +88,13 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
-        let delimeters = vec![TokenType::SemiColon];
+        const DELIMETERS: [TokenType; 1] = [TokenType::SemiColon];
 
         let mut left = self.parse_unary_expression()?;
 
         let mut operator = self.peek()?;
 
-        if delimeters.contains(&operator.token_type) {
+        if DELIMETERS.contains(&operator.token_type) {
             return Ok(left);
         }
 
@@ -113,7 +113,7 @@ impl Parser {
 
             operator = self.peek()?;
 
-            if delimeters.contains(&operator.token_type) {
+            if DELIMETERS.contains(&operator.token_type) {
                 return Ok(left);
             }
 
