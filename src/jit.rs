@@ -96,23 +96,16 @@ impl Drop for Jit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::generator::gen_assembly;
-    use crate::lexer::lex;
-    use crate::parser::parse;
+    use crate::error::DynoResult;
 
-    fn get_asm(input: &str) -> Vec<u8> {
-        let asm = gen_assembly(parse(lex(input).unwrap()).unwrap()).unwrap();
-        println!("{:02x?}", asm);
-        asm
+    #[test]
+    fn jit_new() -> DynoResult<()> {
+        let _ = Jit::new(&[]);
+        Ok(())
     }
 
     #[test]
-    fn jit_new() {
-        let _ = Jit::new(&get_asm("return 0;"));
-    }
-
-    #[test]
-    fn jit_execute_code() {
+    fn jit_execute_code() -> DynoResult<()> {
         let code: Vec<u8> = vec![
             0x55, //    push   %rbp
             0x48, 0x89, 0xe5, //    mov    %rsp,%rbp
@@ -123,47 +116,6 @@ mod tests {
 
         let memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
-    }
-
-    #[test]
-    fn jit_execute_single_int() {
-        let jit = Jit::new(&get_asm("return 42;"));
-        assert_eq!(jit.run(), 42);
-    }
-
-    #[test]
-    fn jit_execute_add_expression() {
-        let jit = Jit::new(&get_asm("return 42 + 12;"));
-        assert_eq!(jit.run(), 54);
-    }
-
-    #[test]
-    fn jit_execute_subtract_expression() {
-        let jit = Jit::new(&get_asm("return 42 - 12;"));
-        assert_eq!(jit.run(), 30);
-    }
-
-    #[test]
-    fn jit_execute_add_subtract_expression() {
-        let jit = Jit::new(&get_asm("return 42 - 12 + 12 - 5 + 2284;"));
-        assert_eq!(jit.run(), 2321);
-    }
-
-    #[test]
-    fn jit_execute_multiply_expression() {
-        let jit = Jit::new(&get_asm("return 2 * 4 * 3;"));
-        assert_eq!(jit.run(), 24);
-    }
-
-    #[test]
-    fn jit_execute_divide_expression() {
-        let jit = Jit::new(&get_asm("return 16 / 4 / 2;"));
-        assert_eq!(jit.run(), 2);
-    }
-
-    #[test]
-    fn jit_execute_complete_expression() {
-        let jit = Jit::new(&get_asm("return 12 / 3 + 7 * 8 - 10 / 2 * 4;"));
-        assert_eq!(jit.run(), 40);
+        Ok(())
     }
 }
