@@ -144,4 +144,15 @@ mod tests {
         jit.run();
         Ok(())
     }
+
+    #[test]
+    fn jit_huge() -> DynoResult<()> {
+        let mut code: Vec<u8> = vec![0x90; PAGE_SIZE * 16];
+        code.extend(&[0xb8, 0x37, 0x00, 0x00, 0x00, 0xc3]);
+
+        let jit = Jit::new(&code);
+        assert_eq!(jit.run(), 0x37);
+
+        Ok(())
+    }
 }
