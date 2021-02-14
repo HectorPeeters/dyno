@@ -1,58 +1,47 @@
 use dyno::error::DynoResult;
+use dyno::generator::gen_assembly;
 use dyno::jit::Jit;
 use dyno::lexer::lex;
 use dyno::parser::parse;
-use dyno::generator::gen_assembly;
 
-fn get_asm(input: &str) -> DynoResult<Vec<u8>> {
-    gen_assembly(parse(lex(input)?)?)
-}
-
-#[test]
-fn jit_execute_single_int() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 42;")?);
-    assert_eq!(jit.run(), 42);
+fn assert_run(input: &str, value: u64) -> DynoResult<()> {
+    let asm = gen_assembly(parse(lex(input)?)?)?;
+    let jit = Jit::new(&asm);
+    assert_eq!(jit.run(), value);
     Ok(())
 }
 
 #[test]
-fn jit_execute_add_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 42 + 12;")?);
-    assert_eq!(jit.run(), 54);
-    Ok(())
+fn execute_single_int() -> DynoResult<()> {
+    assert_run("return 42;", 42)
 }
 
 #[test]
-fn jit_execute_subtract_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 42 - 12;")?);
-    assert_eq!(jit.run(), 30);
-    Ok(())
+fn execute_add_expression() -> DynoResult<()> {
+    assert_run("return 42 + 12;", 54)
 }
 
 #[test]
-fn jit_execute_add_subtract_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 42 - 12 + 12 - 5 + 2284;")?);
-    assert_eq!(jit.run(), 2321);
-    Ok(())
+fn execute_subtract_expression() -> DynoResult<()> {
+    assert_run("return 42 - 12;", 30)
 }
 
 #[test]
-fn jit_execute_multiply_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 2 * 4 * 3;")?);
-    assert_eq!(jit.run(), 24);
-    Ok(())
+fn execute_add_subtract_expression() -> DynoResult<()> {
+    assert_run("return 42 - 12 + 12 - 5 + 2284;", 2321)
 }
 
 #[test]
-fn jit_execute_divide_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 16 / 4 / 2;")?);
-    assert_eq!(jit.run(), 2);
-    Ok(())
+fn execute_multiply_expression() -> DynoResult<()> {
+    assert_run("return 2 * 4 * 3;", 24)
 }
 
 #[test]
-fn jit_execute_complete_expression() -> DynoResult<()> {
-    let jit = Jit::new(&get_asm("return 12 / 3 + 7 * 8 - 10 / 2 * 4;")?);
-    assert_eq!(jit.run(), 40);
-    Ok(())
+fn execute_divide_expression() -> DynoResult<()> {
+    assert_run("return 16 / 4 / 2;", 2)
+}
+
+#[test]
+fn execute_complete_expression() -> DynoResult<()> {
+    assert_run("return 12 / 3 + 7 * 8 - 10 / 2 * 4;", 40)
 }
