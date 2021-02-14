@@ -14,7 +14,9 @@ pub struct Jit {
 impl Jit {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     pub fn new(instructions: &[u8]) -> Jit {
-        let num_pages = (instructions.len() as f32 / PAGE_SIZE as f32).ceil() as usize;
+        let num_pages = (instructions.len() as f32 / PAGE_SIZE as f32)
+            .ceil()
+            .max(1.0) as usize;
         let size: usize = num_pages * PAGE_SIZE;
         let addr: *mut u8;
         let mut raw_addr: *mut libc::c_void;
@@ -116,6 +118,30 @@ mod tests {
 
         let memory = Jit::new(&code);
         assert_eq!(memory.run(), 0x37);
+        Ok(())
+    }
+
+    #[test]
+    fn jit_execute_code_multiple() -> DynoResult<()> {
+        let code: Vec<u8> = vec![
+            0x55, //    push   %rbp
+            0x48, 0x89, 0xe5, //    mov    %rsp,%rbp
+            0xb8, 0x37, 0x00, 0x00, 0x00, //    mov    $0x37,%eax
+            0xc9, //    leaveq
+            0xc3, //    retq
+        ];
+
+        let memory = Jit::new(&code);
+        for _ in 0..1000 {
+            assert_eq!(memory.run(), 0x37);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn jit_execute_empty() -> DynoResult<()> {
+        let jit = Jit::new(&[]);
+        jit.run();
         Ok(())
     }
 }
