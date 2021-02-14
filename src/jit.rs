@@ -2,7 +2,7 @@ use std::mem;
 
 const PAGE_SIZE: usize = 4096;
 
-type FnPtr = extern "C" fn() -> u64;
+type JitFnPtr = extern "C" fn() -> u64;
 
 pub struct Jit {
     addr: *mut u8,
@@ -68,7 +68,7 @@ impl Jit {
         self.mark_executable();
 
         unsafe {
-            let fn_ptr: FnPtr = mem::transmute(self.addr);
+            let fn_ptr: JitFnPtr = mem::transmute(self.addr);
 
             result = fn_ptr();
         }
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn jit_huge() -> DynoResult<()> {
-        let mut code: Vec<u8> = vec![0x90; PAGE_SIZE * 16];
+        let mut code: Vec<u8> = vec![0x90; PAGE_SIZE * 4];
         code.extend(&[0xb8, 0x37, 0x00, 0x00, 0x00, 0xc3]);
 
         let jit = Jit::new(&code);
