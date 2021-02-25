@@ -2,7 +2,7 @@ use crate::error::*;
 use crate::lexer::TokenType;
 use crate::types::DynoType;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperationType {
     Add,
     Subtract,

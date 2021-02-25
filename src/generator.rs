@@ -271,6 +271,63 @@ impl X86Generator {
         self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])
     }
 
+    fn gen_binary_operation(
+        &mut self,
+        op_type: BinaryOperationType,
+        left_reg: Reg,
+        right_reg: Reg,
+    ) -> DynoResult<Reg> {
+        match op_type {
+            BinaryOperationType::Add => self.write_addq_reg_reg(right_reg, left_reg)?,
+            BinaryOperationType::Subtract => self.write_subq_reg_reg(right_reg, left_reg)?,
+            BinaryOperationType::Multiply => {
+                self.write_movq_reg_reg(right_reg, Reg::Rax)?;
+                self.write_mulq_reg(left_reg)?;
+                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+            }
+            BinaryOperationType::Divide => {
+                self.write_movq_reg_reg(left_reg, Reg::Rax)?;
+                self.write(&[0x99])?;
+                self.write_divq_reg(right_reg)?;
+                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+            }
+            BinaryOperationType::Equal => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_sete_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+            BinaryOperationType::NotEqual => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_setne_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+            BinaryOperationType::LessThan => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_setl_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+            BinaryOperationType::LessThanEqual => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_setle_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+            BinaryOperationType::GreaterThan => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_setg_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+            BinaryOperationType::GreaterThanEqual => {
+                self.write_cmp_reg_reg(left_reg, right_reg)?;
+                self.write_setge_reg(left_reg)?;
+                self.write_movzx_reg(left_reg)?;
+            }
+        }
+
+        self.free_reg(right_reg)?;
+
+        Ok(left_reg)
+    }
+
     fn gen_expression(&mut self, ast: &AstNode) -> DynoResult<Reg> {
         match ast {
             AstNode::IntegerLiteral(value, _) => {
@@ -282,57 +339,7 @@ impl X86Generator {
                 let left_reg = self.gen_expression(left)?;
                 let right_reg = self.gen_expression(right)?;
 
-                match op_type {
-                    BinaryOperationType::Add => self.write_addq_reg_reg(right_reg, left_reg)?,
-                    BinaryOperationType::Subtract => {
-                        self.write_subq_reg_reg(right_reg, left_reg)?
-                    }
-                    BinaryOperationType::Multiply => {
-                        self.write_movq_reg_reg(right_reg, Reg::Rax)?;
-                        self.write_mulq_reg(left_reg)?;
-                        self.write_movq_reg_reg(Reg::Rax, left_reg)?;
-                    }
-                    BinaryOperationType::Divide => {
-                        self.write_movq_reg_reg(left_reg, Reg::Rax)?;
-                        self.write(&[0x99])?;
-                        self.write_divq_reg(right_reg)?;
-                        self.write_movq_reg_reg(Reg::Rax, left_reg)?;
-                    }
-                    BinaryOperationType::Equal => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_sete_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                    BinaryOperationType::NotEqual => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_setne_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                    BinaryOperationType::LessThan => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_setl_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                    BinaryOperationType::LessThanEqual => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_setle_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                    BinaryOperationType::GreaterThan => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_setg_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                    BinaryOperationType::GreaterThanEqual => {
-                        self.write_cmp_reg_reg(left_reg, right_reg)?;
-                        self.write_setge_reg(left_reg)?;
-                        self.write_movzx_reg(left_reg)?;
-                    }
-                }
-
-                self.free_reg(right_reg)?;
-
-                Ok(left_reg)
+                self.gen_binary_operation(*op_type, left_reg, right_reg)
             }
             _ => Err(DynoError::GeneratorError(format!(
                 "Cannot gen expression for {:?}",
@@ -352,6 +359,11 @@ impl X86Generator {
                 for node in nodes {
                     self.gen_single_node(node)?;
                 }
+            }
+            AstNode::Declaration(name, value_type) => {}
+            AstNode::Assignment(name, expression) => {
+                let reg = self.gen_expression(expression)?;
+                //TODO: write value to variable "name"
             }
             _ => {
                 return Err(DynoError::GeneratorError(format!(
