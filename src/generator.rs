@@ -259,10 +259,6 @@ impl X86Generator {
         self.write(&[first_byte, 0x0F, 0xB6, 0xC0 + x.get_r_adapted_value() * 9])
     }
 
-    fn write_cqto(&mut self) -> DynoResult<()> {
-        self.write(&[0x48, 0x99])
-    }
-
     fn write_prologue(&mut self) -> DynoResult<()> {
         self.write(&[0x55, 0x48, 0x89, 0xE5])
     }
@@ -360,9 +356,9 @@ impl X86Generator {
                     self.gen_single_node(node)?;
                 }
             }
-            AstNode::Declaration(name, value_type) => {}
-            AstNode::Assignment(name, expression) => {
-                let reg = self.gen_expression(expression)?;
+            AstNode::Declaration(_, _) => {}
+            AstNode::Assignment(_name, expression) => {
+                let _reg = self.gen_expression(expression)?;
                 //TODO: write value to variable "name"
             }
             _ => {

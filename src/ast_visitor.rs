@@ -9,7 +9,7 @@ pub trait AstVisitor {
         match ast {
             Assignment(_, expression) => self.visit_expression(expression),
             Return(expression) => self.visit_expression(expression),
-            Block(nodes) => nodes.iter().map(|x| self.visit(x)).collect(),
+            Block(nodes) => nodes.iter().try_for_each(|x| self.visit(x)),
             _ => Err(DynoError::VisitError(format!(
                 "Unexpected ast node: {:#?}",
                 ast

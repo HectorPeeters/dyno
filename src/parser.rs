@@ -160,7 +160,7 @@ impl Parser {
         let variable_type = self.parse_type()?;
 
         if self.peek()?.token_type == TokenType::SemiColon {
-            self.consume_expect(TokenType::SemiColon);
+            self.consume_expect(TokenType::SemiColon)?;
             // We just have a declaration here
             return Ok(AstNode::Declaration(variable_name, variable_type));
         }
