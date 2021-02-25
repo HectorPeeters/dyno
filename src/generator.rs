@@ -209,6 +209,25 @@ impl X86Generator {
         }
     }
 
+    fn write_cmp_reg_reg(&mut self, a: Reg, b: Reg) -> DynoResult<()> {
+        let instr_byte_1 = match (a.is_r(), b.is_r()) {
+            (false, false) => 0x48,
+            (false, true) => 0x49,
+            (true, false) => 0x4c,
+            (true, true) => 0x4d,
+        };
+        self.write(&[
+            instr_byte_1,
+            0x39,
+            0xC0 + (b.get_r_adapted_value() * 8 + a.get_r_adapted_value()),
+        ])
+    }
+
+    fn write_sete_reg(&mut self, x: Reg) -> DynoResult<()> {
+        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
+        self.write(&[first_byte, 0x0F, 0x94, 0xC0 + x.get_r_adapted_value()])
+    }
+
     fn write_cqto(&mut self) -> DynoResult<()> {
         self.write(&[0x48, 0x99])
     }
@@ -247,6 +266,10 @@ impl X86Generator {
                         self.write(&[0x99])?;
                         self.write_divq_reg(right_reg)?;
                         self.write_movq_reg_reg(Reg::Rax, left_reg)?;
+                    }
+                    BinaryOperationType::Equal => {
+                        self.write_cmp_reg_reg(right_reg, left_reg)?;
+                        self.write_sete_reg(left_reg)?;
                     }
                     _ => unimplemented!(),
                 }
@@ -356,6 +379,40 @@ mod tests {
             generator.writer.buffer(),
             &[0x4D, 0x89, 0xFC, 0x49, 0x89, 0xDC, 0x4C, 0x89, 0xEE, 0x48, 0x89, 0xCA]
         );
+    }
+
+    #[test]
+    fn generate_sete() -> DynoResult<()> {
+        let mut generator = X86Generator::new();
+
+        generator.write_sete_reg(Reg::Rax)?;
+        generator.write_sete_reg(Reg::Rcx)?;
+        generator.write_sete_reg(Reg::Rdx)?;
+        generator.write_sete_reg(Reg::Rbx)?;
+        generator.write_sete_reg(Reg::Rsp)?;
+        generator.write_sete_reg(Reg::Rbp)?;
+        generator.write_sete_reg(Reg::Rsi)?;
+        generator.write_sete_reg(Reg::Rdi)?;
+        generator.write_sete_reg(Reg::R8)?;
+        generator.write_sete_reg(Reg::R9)?;
+        generator.write_sete_reg(Reg::R10)?;
+        generator.write_sete_reg(Reg::R11)?;
+        generator.write_sete_reg(Reg::R12)?;
+        generator.write_sete_reg(Reg::R13)?;
+        generator.write_sete_reg(Reg::R14)?;
+        generator.write_sete_reg(Reg::R15)?;
+
+        assert_eq!(
+            generator.writer.buffer(),
+            &[
+                0x40, 0x0F, 0x94, 0xC0, 0x40, 0x0F, 0x94, 0xC1, 0x40, 0x0F, 0x94, 0xC2, 0x40, 0x0F,
+                0x94, 0xC3, 0x40, 0x0F, 0x94, 0xC4, 0x40, 0x0F, 0x94, 0xC5, 0x40, 0x0F, 0x94, 0xC6,
+                0x40, 0x0F, 0x94, 0xC7, 0x41, 0x0F, 0x94, 0xC0, 0x41, 0x0F, 0x94, 0xC1, 0x41, 0x0F,
+                0x94, 0xC2, 0x41, 0x0F, 0x94, 0xC3, 0x41, 0x0F, 0x94, 0xC4, 0x41, 0x0F, 0x94, 0xC5,
+                0x41, 0x0F, 0x94, 0xC6, 0x41, 0x0F, 0x94, 0xC7
+            ]
+        );
+        Ok(())
     }
 
     #[test]
