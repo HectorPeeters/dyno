@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
 use crate::lexer::{Token, TokenType};
+use crate::types::DynoType;
 
 struct Parser {
     tokens: Vec<Token>,
@@ -134,9 +135,28 @@ impl Parser {
         Ok(left)
     }
 
+    fn parse_type(&mut self) -> DynoResult<DynoType> {
+        use TokenType::*;
+
+        let token = self.consume()?;
+
+        match token.token_type {
+            UnsignedIntType(size) => Ok(DynoType::UnsignedInt(size)),
+            SignedIntType(size) => Ok(DynoType::SignedInt(size)),
+            _ => Err(DynoError::UnexpectedTokenError(
+                token.token_type,
+                vec![UnsignedIntType(0), SignedIntType(0), Bool],
+            )),
+        }
+    }
+
     fn parse_declaration(&mut self) -> DynoResult<AstNode> {
         self.consume_expect(TokenType::Let)?;
+
         let variable_name = self.consume_expect(TokenType::Identifier)?.value.clone();
+        self.consume_expect(TokenType::Colon)?;
+
+        let variable_type = self.parse_type()?;
         self.consume_expect(TokenType::Equals)?;
 
         let expression = self.parse_expression(0)?;
@@ -291,7 +311,7 @@ mod tests {
 
     #[test]
     fn parser_simple_assignment() -> DynoResult<()> {
-        let ast = get_ast("let a = 12;")?;
+        let ast = get_ast("let a: u32 = 12;")?;
 
         assert_eq!(
             ast,
@@ -302,7 +322,7 @@ mod tests {
 
     #[test]
     fn parser_complex_assignment() -> DynoResult<()> {
-        let ast = get_ast("let a = 12 - 2 * 4;")?;
+        let ast = get_ast("let a: u32 = 12 - 2 * 4;")?;
 
         assert_eq!(
             ast,
