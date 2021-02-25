@@ -254,6 +254,11 @@ impl X86Generator {
         self.write(&[first_byte, 0x0F, 0x9D, 0xC0 + x.get_r_adapted_value()])
     }
 
+    fn write_movzx_reg(&mut self, x: Reg) -> DynoResult<()> {
+        let first_byte = if x.is_r() { 0x4D } else { 0x48 };
+        self.write(&[first_byte, 0x0F, 0xB6, 0xC0 + x.get_r_adapted_value() * 9])
+    }
+
     fn write_cqto(&mut self) -> DynoResult<()> {
         self.write(&[0x48, 0x99])
     }
@@ -296,26 +301,32 @@ impl X86Generator {
                     BinaryOperationType::Equal => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_sete_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                     BinaryOperationType::NotEqual => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_setne_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                     BinaryOperationType::LessThan => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_setl_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                     BinaryOperationType::LessThanEqual => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_setle_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                     BinaryOperationType::GreaterThan => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_setg_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                     BinaryOperationType::GreaterThanEqual => {
                         self.write_cmp_reg_reg(left_reg, right_reg)?;
                         self.write_setge_reg(left_reg)?;
+                        self.write_movzx_reg(left_reg)?;
                     }
                 }
 
@@ -430,22 +441,9 @@ mod tests {
     fn generate_sete() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
-        generator.write_sete_reg(Reg::Rax)?;
-        generator.write_sete_reg(Reg::Rcx)?;
-        generator.write_sete_reg(Reg::Rdx)?;
-        generator.write_sete_reg(Reg::Rbx)?;
-        generator.write_sete_reg(Reg::Rsp)?;
-        generator.write_sete_reg(Reg::Rbp)?;
-        generator.write_sete_reg(Reg::Rsi)?;
-        generator.write_sete_reg(Reg::Rdi)?;
-        generator.write_sete_reg(Reg::R8)?;
-        generator.write_sete_reg(Reg::R9)?;
-        generator.write_sete_reg(Reg::R10)?;
-        generator.write_sete_reg(Reg::R11)?;
-        generator.write_sete_reg(Reg::R12)?;
-        generator.write_sete_reg(Reg::R13)?;
-        generator.write_sete_reg(Reg::R14)?;
-        generator.write_sete_reg(Reg::R15)?;
+        for i in 0..16 {
+            generator.write_sete_reg(Reg::from(i))?;
+        }
 
         assert_eq!(
             generator.writer.buffer(),
@@ -455,6 +453,27 @@ mod tests {
                 0x40, 0x0F, 0x94, 0xC7, 0x41, 0x0F, 0x94, 0xC0, 0x41, 0x0F, 0x94, 0xC1, 0x41, 0x0F,
                 0x94, 0xC2, 0x41, 0x0F, 0x94, 0xC3, 0x41, 0x0F, 0x94, 0xC4, 0x41, 0x0F, 0x94, 0xC5,
                 0x41, 0x0F, 0x94, 0xC6, 0x41, 0x0F, 0x94, 0xC7
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generate_movzx() -> DynoResult<()> {
+        let mut generator = X86Generator::new();
+
+        for i in 0..16 {
+            generator.write_movzx_reg(Reg::from(i))?;
+        }
+
+        assert_eq!(
+            generator.writer.buffer(),
+            &[
+                0x48, 0x0F, 0xB6, 0xC0, 0x48, 0x0F, 0xB6, 0xC9, 0x48, 0x0F, 0xB6, 0xD2, 0x48, 0x0F,
+                0xB6, 0xDB, 0x48, 0x0F, 0xB6, 0xE4, 0x48, 0x0F, 0xB6, 0xED, 0x48, 0x0F, 0xB6, 0xF6,
+                0x48, 0x0F, 0xB6, 0xFF, 0x4D, 0x0F, 0xB6, 0xC0, 0x4D, 0x0F, 0xB6, 0xC9, 0x4D, 0x0F,
+                0xB6, 0xD2, 0x4D, 0x0F, 0xB6, 0xDB, 0x4D, 0x0F, 0xB6, 0xE4, 0x4D, 0x0F, 0xB6, 0xED,
+                0x4D, 0x0F, 0xB6, 0xF6, 0x4D, 0x0F, 0xB6, 0xFF
             ]
         );
         Ok(())
