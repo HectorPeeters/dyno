@@ -150,20 +150,28 @@ impl Parser {
         }
     }
 
-    fn parse_declaration(&mut self) -> DynoResult<AstNode> {
+    fn parse_declaration_or_assignment(&mut self) -> DynoResult<AstNode> {
         self.consume_expect(TokenType::Let)?;
 
         let variable_name = self.consume_expect(TokenType::Identifier)?.value.clone();
         self.consume_expect(TokenType::Colon)?;
 
         let variable_type = self.parse_type()?;
+        if self.peek()?.token_type == TokenType::SemiColon {
+            // We just have a declaration here
+            return Ok(AstNode::Declaration(variable_name, variable_type));
+        }
+
         self.consume_expect(TokenType::Equals)?;
 
         let expression = self.parse_expression(0)?;
 
         self.consume_expect(TokenType::SemiColon)?;
 
-        Ok(AstNode::Assignment(variable_name, Box::new(expression)))
+        Ok(AstNode::Block(vec![
+            AstNode::Declaration(variable_name.clone(), variable_type),
+            AstNode::Assignment(variable_name, Box::new(expression)),
+        ]))
     }
 
     fn parse_return_statement(&mut self) -> DynoResult<AstNode> {
@@ -182,7 +190,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
 
     while !parser.is_eof() {
         let node = match parser.peek()?.token_type {
-            TokenType::Let => parser.parse_declaration(),
+            TokenType::Let => parser.parse_declaration_or_assignment(),
             TokenType::Return => parser.parse_return_statement(),
             _ => {
                 let node = parser.parse_expression(0);
@@ -315,7 +323,10 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Assignment("a".to_string(), Box::new(AstNode::IntegerLiteral(12, 4)))
+            AstNode::Block(vec![
+                AstNode::Declaration("a".to_string(), DynoType::UnsignedInt(32)),
+                AstNode::Assignment("a".to_string(), Box::new(AstNode::IntegerLiteral(12, 4)))
+            ])
         );
         Ok(())
     }
@@ -326,18 +337,21 @@ mod tests {
 
         assert_eq!(
             ast,
-            AstNode::Assignment(
-                "a".to_string(),
-                Box::new(AstNode::BinaryOperation(
-                    BinaryOperationType::Subtract,
-                    Box::new(AstNode::IntegerLiteral(12, 4)),
+            AstNode::Block(vec![
+                AstNode::Declaration("a".to_string(), DynoType::UnsignedInt(32)),
+                AstNode::Assignment(
+                    "a".to_string(),
                     Box::new(AstNode::BinaryOperation(
-                        BinaryOperationType::Multiply,
-                        Box::new(AstNode::IntegerLiteral(2, 2)),
-                        Box::new(AstNode::IntegerLiteral(4, 3))
+                        BinaryOperationType::Subtract,
+                        Box::new(AstNode::IntegerLiteral(12, 4)),
+                        Box::new(AstNode::BinaryOperation(
+                            BinaryOperationType::Multiply,
+                            Box::new(AstNode::IntegerLiteral(2, 2)),
+                            Box::new(AstNode::IntegerLiteral(4, 3))
+                        ))
                     ))
-                ))
-            )
+                )
+            ])
         );
         Ok(())
     }
