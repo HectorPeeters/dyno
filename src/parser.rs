@@ -143,6 +143,7 @@ impl Parser {
         match token.token_type {
             UnsignedIntType(size) => Ok(DynoType::UnsignedInt(size)),
             SignedIntType(size) => Ok(DynoType::SignedInt(size)),
+            Bool => Ok(DynoType::Bool()),
             _ => Err(DynoError::UnexpectedTokenError(
                 token.token_type,
                 vec![UnsignedIntType(0), SignedIntType(0), Bool],
@@ -157,7 +158,9 @@ impl Parser {
         self.consume_expect(TokenType::Colon)?;
 
         let variable_type = self.parse_type()?;
+
         if self.peek()?.token_type == TokenType::SemiColon {
+            self.consume_expect(TokenType::SemiColon);
             // We just have a declaration here
             return Ok(AstNode::Declaration(variable_name, variable_type));
         }
@@ -314,6 +317,23 @@ mod tests {
                 Box::new(AstNode::IntegerLiteral(2, 2))
             )
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_simple_declaration() -> DynoResult<()> {
+        let ast = get_ast("let a: u32;")?;
+        assert_eq!(
+            ast,
+            AstNode::Declaration("a".to_string(), DynoType::UnsignedInt(32))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_simple_boolean() -> DynoResult<()> {
+        let ast = get_ast("let a: bool;")?;
+        assert_eq!(ast, AstNode::Declaration("a".to_string(), DynoType::Bool()));
         Ok(())
     }
 
