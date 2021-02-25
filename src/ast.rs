@@ -77,7 +77,7 @@ impl BinaryOperationType {
 }
 
 impl AstNode {
-    fn get_type(&self) -> DynoResult<DynoType> {
+    pub fn get_type(&self) -> DynoResult<DynoType> {
         match self {
             AstNode::BinaryOperation(op, left, right) => {
                 use BinaryOperationType::*;

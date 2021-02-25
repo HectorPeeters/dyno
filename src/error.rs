@@ -13,6 +13,7 @@ pub enum DynoError {
     ElfWriteError(),
     X86WriteError(),
     GeneratorError(String),
+    VisitError(String),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
@@ -42,6 +43,7 @@ impl fmt::Display for DynoError {
             ElfWriteError() => write!(f, "Error while writing ELF file"),
             X86WriteError() => write!(f, "Error while writing x86 assembly"),
             GeneratorError(message) => write!(f, "Code generator error: {}", message),
+            VisitError(message) => write!(f, "Visit error: {}", message),
         }
     }
 }
