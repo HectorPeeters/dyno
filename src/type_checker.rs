@@ -11,7 +11,7 @@ impl TypeChecker {
 }
 
 impl AstVisitor for TypeChecker {
-    fn visit_assignment(&self, symbol: &String, expression: &AstNode) -> DynoResult<()> {
+    fn visit_expression(&self, expression: &AstNode) -> DynoResult<()> {
         expression.get_type().map(|_| ())
     }
 }
