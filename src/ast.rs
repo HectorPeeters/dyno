@@ -8,6 +8,12 @@ pub enum BinaryOperationType {
     Subtract,
     Multiply,
     Divide,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,6 +32,12 @@ impl BinaryOperationType {
             TokenType::Minus => Self::Subtract,
             TokenType::Asterix => Self::Multiply,
             TokenType::Slash => Self::Divide,
+            TokenType::DoubleEqual => Self::Equal,
+            TokenType::NotEqual => Self::NotEqual,
+            TokenType::LessThan => Self::LessThan,
+            TokenType::LessThanEqual => Self::LessThanEqual,
+            TokenType::GreaterThan => Self::GreaterThan,
+            TokenType::GreaterThanEqual => Self::GreaterThanEqual,
             _ => {
                 return Err(DynoError::UnexpectedTokenError(
                     token_type,
@@ -34,6 +46,12 @@ impl BinaryOperationType {
                         TokenType::Minus,
                         TokenType::Asterix,
                         TokenType::Slash,
+                        TokenType::DoubleEqual,
+                        TokenType::NotEqual,
+                        TokenType::LessThan,
+                        TokenType::LessThanEqual,
+                        TokenType::GreaterThan,
+                        TokenType::GreaterThanEqual,
                     ],
                 ))
             }
@@ -48,6 +66,12 @@ impl BinaryOperationType {
             Self::Subtract => 1,
             Self::Multiply => 2,
             Self::Divide => 2,
+            Self::Equal => 3,
+            Self::NotEqual => 3,
+            Self::LessThan => 3,
+            Self::LessThanEqual => 3,
+            Self::GreaterThan => 3,
+            Self::GreaterThanEqual => 3,
         }
     }
 }

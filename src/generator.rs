@@ -248,6 +248,7 @@ impl X86Generator {
                         self.write_divq_reg(right_reg)?;
                         self.write_movq_reg_reg(Reg::Rax, left_reg)?;
                     }
+                    _ => unimplemented!(),
                 }
 
                 self.free_reg(right_reg)?;

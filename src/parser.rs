@@ -215,26 +215,27 @@ mod tests {
         assert!(parser.consume().is_err());
     }
 
-    #[test]
-    fn parser_basic_binary_op() {
-        let ast = parse(lex("12 + 4;").unwrap()).unwrap();
+    fn get_ast(text: &str) -> DynoResult<AstNode> {
+        parse(lex(text)?)
+    }
 
+    #[test]
+    fn parser_basic_binary_op() -> DynoResult<()> {
         assert_eq!(
-            ast,
+            get_ast("12 + 4;")?,
             AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::IntegerLiteral(12, 4)),
                 Box::new(AstNode::IntegerLiteral(4, 3)),
             )
         );
+        Ok(())
     }
 
     #[test]
-    fn parser_precendence_a() {
-        let ast = parse(lex("12 + 4 * 7;").unwrap()).unwrap();
-
+    fn parser_precendence_a() -> DynoResult<()> {
         assert_eq!(
-            ast,
+            get_ast("12 + 4 * 7;")?,
             AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::IntegerLiteral(12, 4)),
@@ -245,14 +246,13 @@ mod tests {
                 )),
             )
         );
+        Ok(())
     }
 
     #[test]
-    fn parser_precendence_b() {
-        let ast = parse(lex("12 * 4 + 7;").unwrap()).unwrap();
-
+    fn parser_precendence_b() -> DynoResult<()> {
         assert_eq!(
-            ast,
+            get_ast("12 * 4 + 7;")?,
             AstNode::BinaryOperation(
                 Add,
                 Box::new(AstNode::BinaryOperation(
@@ -263,6 +263,20 @@ mod tests {
                 Box::new(AstNode::IntegerLiteral(7, 3)),
             )
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_equals_operator() -> DynoResult<()> {
+        assert_eq!(
+            get_ast("1 == 2;")?,
+            AstNode::BinaryOperation(
+                Equal,
+                Box::new(AstNode::IntegerLiteral(1, 1)),
+                Box::new(AstNode::IntegerLiteral(2, 2))
+            )
+        );
+        Ok(())
     }
 
     #[test]
@@ -371,12 +385,6 @@ mod tests {
         let mut parser = Parser::new(lex("5 + 12 8").unwrap());
         let node = parser.parse_expression(0);
 
-        assert_eq!(
-            node,
-            Err(DynoError::UnexpectedTokenError(
-                IntegerLiteral,
-                vec![Plus, Minus, Asterix, Slash]
-            ))
-        );
+        assert!(node.is_err());
     }
 }
