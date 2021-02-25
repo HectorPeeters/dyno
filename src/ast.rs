@@ -79,14 +79,26 @@ impl BinaryOperationType {
 impl AstNode {
     fn get_type(&self) -> DynoResult<DynoType> {
         match self {
-            AstNode::BinaryOperation(_, left, right) => {
+            AstNode::BinaryOperation(op, left, right) => {
+                use BinaryOperationType::*;
+
                 let left_type = left.get_type()?;
                 let right_type = right.get_type()?;
-                match (left_type, right_type) {
-                    (DynoType::UnsignedInt(l_size), DynoType::UnsignedInt(r_size)) => {
-                        Ok(DynoType::UnsignedInt(std::cmp::max(l_size, r_size)))
-                    }
-                    (_, _) => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
+                match op {
+                    Equal | NotEqual | LessThan | LessThanEqual | GreaterThan
+                    | GreaterThanEqual => match (left_type, right_type) {
+                        (DynoType::UnsignedInt(_), DynoType::UnsignedInt(_)) => {
+                            Ok(DynoType::Bool())
+                        }
+
+                        (_, _) => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
+                    },
+                    _ => match (left_type, right_type) {
+                        (DynoType::UnsignedInt(l_size), DynoType::UnsignedInt(r_size)) => {
+                            Ok(DynoType::UnsignedInt(std::cmp::max(l_size, r_size)))
+                        }
+                        (_, _) => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
+                    },
                 }
             }
             AstNode::IntegerLiteral(_, size) => Ok(DynoType::UnsignedInt(*size)),
