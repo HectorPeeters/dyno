@@ -75,20 +75,32 @@ impl Parser {
         }
     }
 
-    fn parse_unary_expression(&mut self) -> DynoResult<AstNode> {
+    fn parse_primary_expression(&mut self) -> DynoResult<AstNode> {
+        use TokenType::*;
+
         let next = self.peek()?;
 
         match next.token_type {
-            TokenType::IntegerLiteral => self.parse_integer_literal(),
+            IntegerLiteral => self.parse_integer_literal(),
+            LeftParen => {
+                self.consume_expect(LeftParen);
+                let expression = self.parse_expression(0)?;
+                self.consume_expect(RightParen);
+                Ok(expression)
+            }
             _ => Err(DynoError::UnexpectedTokenError(
                 next.token_type,
-                vec![TokenType::IntegerLiteral],
+                vec![IntegerLiteral, LeftParen],
             )),
         }
     }
 
+    fn parse_unary_expression(&mut self) -> DynoResult<AstNode> {
+        self.parse_primary_expression()
+    }
+
     fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
-        const DELIMETERS: [TokenType; 1] = [TokenType::SemiColon];
+        const DELIMETERS: [TokenType; 2] = [TokenType::SemiColon, TokenType::RightParen];
 
         let mut left = self.parse_unary_expression()?;
 
@@ -106,8 +118,6 @@ impl Parser {
             self.consume_expect(token_type)?;
 
             let right = self.parse_expression(current_precendence)?;
-
-            //TODO: do type checking here
 
             left = AstNode::BinaryOperation(operator_type, Box::new(left), Box::new(right));
 
@@ -280,18 +290,19 @@ mod tests {
     }
 
     #[test]
-    fn parser_simple_assignment() {
-        let ast = parse(lex("let a = 12;").unwrap()).unwrap();
+    fn parser_simple_assignment() -> DynoResult<()> {
+        let ast = get_ast("let a = 12;")?;
 
         assert_eq!(
             ast,
             AstNode::Assignment("a".to_string(), Box::new(AstNode::IntegerLiteral(12, 4)))
         );
+        Ok(())
     }
 
     #[test]
-    fn parser_complex_assignment() {
-        let ast = parse(lex("let a = 12 - 2 * 4;").unwrap()).unwrap();
+    fn parser_complex_assignment() -> DynoResult<()> {
+        let ast = get_ast("let a = 12 - 2 * 4;")?;
 
         assert_eq!(
             ast,
@@ -308,6 +319,34 @@ mod tests {
                 ))
             )
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_simple_parentheses() -> DynoResult<()> {
+        let ast = get_ast("(12);")?;
+        assert_eq!(ast, AstNode::IntegerLiteral(12, 4));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_parentheses_expression() -> DynoResult<()> {
+        use AstNode::*;
+        use BinaryOperationType::*;
+        let ast = get_ast("(4 + 2) * 3;")?;
+        assert_eq!(
+            ast,
+            BinaryOperation(
+                Multiply,
+                Box::new(BinaryOperation(
+                    Add,
+                    Box::new(IntegerLiteral(4, 3)),
+                    Box::new(IntegerLiteral(2, 2))
+                )),
+                Box::new(IntegerLiteral(3, 2))
+            )
+        );
+        Ok(())
     }
 
     #[test]
@@ -374,10 +413,7 @@ mod tests {
         ]);
         let node = parser.parse_expression(0);
 
-        assert_eq!(
-            node,
-            Err(DynoError::UnexpectedTokenError(Plus, vec![IntegerLiteral]))
-        );
+        assert!(node.is_err());
     }
 
     #[test]
