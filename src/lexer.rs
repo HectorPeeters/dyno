@@ -27,6 +27,19 @@ pub enum TokenType {
     #[regex(r"/")]
     Slash,
 
+    #[regex(r"==")]
+    DoubleEqual,
+    #[regex(r"!=")]
+    NotEqual,
+    #[regex(r"<")]
+    LessThan,
+    #[regex(r"<=")]
+    LessThanEqual,
+    #[regex(r">")]
+    GreaterThan,
+    #[regex(r">=")]
+    GreaterThanEqual,
+
     #[regex(r"=")]
     Equals,
 
@@ -144,5 +157,19 @@ mod tests {
             tokens.err().unwrap(),
             DynoError::LexerError("&".to_string(), 7..8)
         );
+    }
+
+    #[test]
+    fn lexer_test_comparison_operators() -> DynoResult<()> {
+        let tokens = lex("== != < <= > >=")?;
+
+        assert_eq!(tokens[0].token_type, DoubleEqual);
+        assert_eq!(tokens[1].token_type, NotEqual);
+        assert_eq!(tokens[2].token_type, LessThan);
+        assert_eq!(tokens[3].token_type, LessThanEqual);
+        assert_eq!(tokens[4].token_type, GreaterThan);
+        assert_eq!(tokens[5].token_type, GreaterThanEqual);
+
+        Ok(())
     }
 }
