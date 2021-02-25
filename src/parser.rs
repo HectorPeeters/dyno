@@ -83,9 +83,9 @@ impl Parser {
         match next.token_type {
             IntegerLiteral => self.parse_integer_literal(),
             LeftParen => {
-                self.consume_expect(LeftParen);
+                self.consume_expect(LeftParen)?;
                 let expression = self.parse_expression(0)?;
-                self.consume_expect(RightParen);
+                self.consume_expect(RightParen)?;
                 Ok(expression)
             }
             _ => Err(DynoError::UnexpectedTokenError(

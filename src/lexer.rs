@@ -1,6 +1,15 @@
 use crate::error::*;
-use logos::Logos;
+use logos::{Lexer, Logos};
 use std::ops::Range;
+
+fn parse_int_type(lex: &mut Lexer<TokenType>) -> Option<u32> {
+    let slice = lex.slice();
+    let size = slice[1..].parse().ok()?;
+    match size {
+        8 | 16 | 32 | 64 => Some(size),
+        _ => None,
+    }
+}
 
 #[derive(Logos, Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
@@ -17,6 +26,12 @@ pub enum TokenType {
 
     #[regex(r"[0-9]+")]
     IntegerLiteral,
+
+    #[regex(r"u[0-9]+", parse_int_type)]
+    UnsingedIntType(u32),
+
+    #[regex(r"i[0-9]+", parse_int_type)]
+    SingedIntType(u32),
 
     #[regex(r"\+")]
     Plus,
@@ -43,6 +58,8 @@ pub enum TokenType {
     #[regex(r"=")]
     Equals,
 
+    #[regex(r":")]
+    Colon,
     #[regex(r";")]
     SemiColon,
 
