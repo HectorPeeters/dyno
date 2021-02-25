@@ -115,14 +115,17 @@ impl X86Generator {
         }
     }
 
+    #[allow(dead_code)]
     fn write_u8(&mut self, data: u8) -> DynoResult<()> {
         self.write(&[data])
     }
 
+    #[allow(dead_code)]
     fn write_u16(&mut self, data: u16) -> DynoResult<()> {
         self.write(&[(data & 0xFF) as u8, ((data >> 8) & 0xFF) as u8])
     }
 
+    #[allow(dead_code)]
     fn write_u32(&mut self, data: u32) -> DynoResult<()> {
         self.write(&[
             (data & 0xFF) as u8,

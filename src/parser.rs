@@ -21,6 +21,7 @@ impl Parser {
         Ok(&self.tokens[self.index])
     }
 
+    #[allow(dead_code)]
     fn peek_next(&self, index: usize) -> DynoResult<&Token> {
         if self.index + index >= self.tokens.len() {
             return Err(DynoError::TokenStreamOutOfBounds());
