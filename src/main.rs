@@ -1,17 +1,14 @@
 #![allow(dead_code)]
 
 mod ast;
-mod ast_visitor;
 mod elf;
 mod error;
 mod generator;
 mod jit;
 mod lexer;
 mod parser;
-mod type_checker;
 mod types;
 
-use ast_visitor::AstVisitor;
 use std::env;
 use std::io::{stdin, stdout, Write};
 
@@ -61,13 +58,6 @@ fn main() {
         if args.contains(&"--ast".to_string()) {
             println!("\nAst:");
             println!("{:#?}", ast);
-        }
-
-        // Type checking
-        let type_check = type_checker::TypeChecker::new().visit(&ast);
-        if type_check.is_err() {
-            eprintln!("Typecheck failed: {}", type_check.err().unwrap());
-            continue;
         }
 
         // Code generation
