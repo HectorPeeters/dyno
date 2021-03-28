@@ -15,6 +15,13 @@ pub enum DynoError {
     GeneratorError(String),
     VisitError(String),
     NoneError(),
+    IntoInnerError(),
+}
+
+impl<T> From<std::io::IntoInnerError<T>> for DynoError {
+    fn from(_error: std::io::IntoInnerError<T>) -> Self {
+        DynoError::IntoInnerError()
+    }
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
@@ -46,6 +53,7 @@ impl fmt::Display for DynoError {
             GeneratorError(message) => write!(f, "Code generator error: {}", message),
             VisitError(message) => write!(f, "Visit error: {}", message),
             NoneError() => write!(f, "None error"),
+            IntoInnerError() => write!(f, "Into inner error"), 
         }
     }
 }

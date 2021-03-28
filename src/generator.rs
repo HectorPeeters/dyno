@@ -118,15 +118,13 @@ impl X86Generator {
     }
 
     #[allow(dead_code)]
-    fn pop_buffer_and_merge(&mut self) -> DynoResult<usize> {
+    fn pop_buffer(&mut self) -> DynoResult<Vec<u8>> {
         let writer = self
             .writer_stack
             .pop_front()
             .ok_or(DynoError::NoneError())?;
 
-        self.write(writer.buffer())?;
-
-        Ok(writer.buffer().len())
+        Ok(writer.into_inner()?)
     }
 
     fn write(&mut self, data: &[u8]) -> DynoResult<()> {
@@ -458,8 +456,10 @@ mod tests {
         generator.write_u8(2)?;
         generator.write_u8(3)?;
         generator.write_u8(4)?;
-        assert_eq!(generator.pop_buffer_and_merge(), Ok(3));
-        assert_buffer(&generator, &[1, 2, 3, 4])
+        let buffer = generator.pop_buffer()?;
+        generator.write_u8(5)?;
+        generator.write(&buffer)?;
+        assert_buffer(&generator, &[1, 5, 2, 3, 4])
     }
 
     #[test]
