@@ -112,17 +112,19 @@ impl X86Generator {
         }
     }
 
+    #[allow(dead_code)]
     fn push_buffer(&mut self) {
         self.writer_stack.push_front(BufWriter::new(vec![]));
     }
 
+    #[allow(dead_code)]
     fn pop_buffer_and_merge(&mut self) -> DynoResult<usize> {
         let writer = self
             .writer_stack
             .pop_front()
             .ok_or(DynoError::NoneError())?;
 
-        self.write(writer.buffer());
+        self.write(writer.buffer())?;
 
         Ok(writer.buffer().len())
     }
