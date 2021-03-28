@@ -25,7 +25,7 @@ pub enum TokenType {
     #[regex(r"bool")]
     Bool,
 
-    #[regex(r"[a-zA-Z]+")]
+    #[regex(r"[a-zA-Z][_a-zA-Z]*")]
     Identifier,
 
     #[regex(r"[0-9]+")]
@@ -159,6 +159,15 @@ mod tests {
     }
 
     #[test]
+    fn lexer_keywords() {
+        let tokens = get_tokens("let return if");
+
+        assert_eq!(tokens[0].token_type, Let);
+        assert_eq!(tokens[1].token_type, Return);
+        assert_eq!(tokens[2].token_type, If);
+    }
+
+    #[test]
     fn lexer_integer_literal() {
         let tokens = get_tokens("12 0 439394474 123");
 
@@ -169,24 +178,13 @@ mod tests {
     }
 
     #[test]
-    fn lexer_binary_operands() {
+    fn lexer_binary_operators() {
         let tokens = get_tokens("+-*/");
 
         assert_eq!(tokens[0].token_type, Plus);
         assert_eq!(tokens[1].token_type, Minus);
         assert_eq!(tokens[2].token_type, Asterix);
         assert_eq!(tokens[3].token_type, Slash);
-    }
-
-    #[test]
-    fn lexer_test_error() {
-        let tokens = lex("return &;");
-
-        assert!(tokens.is_err());
-        assert_eq!(
-            tokens.err().unwrap(),
-            DynoError::LexerError("&".to_string(), 7..8)
-        );
     }
 
     #[test]
@@ -201,5 +199,35 @@ mod tests {
         assert_eq!(tokens[5].token_type, GreaterThanEqual);
 
         Ok(())
+    }
+
+    #[test]
+    fn lexer_identifier() {
+        let tokens = get_tokens("test test_with_underscore");
+
+        assert_eq!(tokens[0], Token::new(Identifier, "test"));
+        assert_eq!(tokens[1], Token::new(Identifier, "test_with_underscore"));
+    }
+
+    #[test]
+    fn lexer_invalid_identifier() {
+        let tokens = lex("_identifier");
+
+        assert!(tokens.is_err());
+        assert_eq!(
+            tokens.err().unwrap(),
+            DynoError::LexerError("_".to_string(), 0..1)
+        );
+    }
+
+    #[test]
+    fn lexer_test_error() {
+        let tokens = lex("return &;");
+
+        assert!(tokens.is_err());
+        assert_eq!(
+            tokens.err().unwrap(),
+            DynoError::LexerError("&".to_string(), 7..8)
+        );
     }
 }
