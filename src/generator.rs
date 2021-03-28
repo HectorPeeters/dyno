@@ -112,6 +112,21 @@ impl X86Generator {
         }
     }
 
+    fn push_buffer(&mut self) {
+        self.writer_stack.push_front(BufWriter::new(vec![]));
+    }
+
+    fn pop_buffer_and_merge(&mut self) -> DynoResult<usize> {
+        let writer = self
+            .writer_stack
+            .pop_front()
+            .ok_or(DynoError::NoneError())?;
+
+        self.write(writer.buffer());
+
+        Ok(writer.buffer().len())
+    }
+
     fn write(&mut self, data: &[u8]) -> DynoResult<()> {
         let writer = self
             .writer_stack
@@ -391,6 +406,9 @@ impl X86Generator {
     }
 
     fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
+        // Make sure there are no buffers left on the stack except the main one
+        assert_eq!(self.writer_stack.len(), 1);
+
         self.write_prologue()?;
 
         self.gen_single_node(ast)?;
@@ -428,6 +446,18 @@ mod tests {
     #[test]
     fn generator_new() {
         let _ = X86Generator::new();
+    }
+
+    #[test]
+    fn generator_write_stack() -> DynoResult<()> {
+        let mut generator = X86Generator::new();
+        generator.write_u8(1)?;
+        generator.push_buffer();
+        generator.write_u8(2)?;
+        generator.write_u8(3)?;
+        generator.write_u8(4)?;
+        assert_eq!(generator.pop_buffer_and_merge(), Ok(3));
+        assert_buffer(&generator, &[1, 2, 3, 4])
     }
 
     #[test]
