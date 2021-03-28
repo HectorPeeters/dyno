@@ -149,13 +149,14 @@ mod tests {
     }
 
     #[test]
-    fn lexer_int_types() {
-        let tokens = get_tokens("u8 u16 u32 u64");
+    fn lexer_types() {
+        let tokens = get_tokens("u8 u16 u32 u64 bool");
 
         assert_eq!(tokens[0].token_type, UInt8);
         assert_eq!(tokens[1].token_type, UInt16);
         assert_eq!(tokens[2].token_type, UInt32);
         assert_eq!(tokens[3].token_type, UInt64);
+        assert_eq!(tokens[4].token_type, Bool);
     }
 
     #[test]
@@ -210,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn lexer_invalid_identifier() {
+    fn lexer_identifier_error() {
         let tokens = lex("_identifier");
 
         assert!(tokens.is_err());
