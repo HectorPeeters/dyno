@@ -14,6 +14,7 @@ pub enum DynoError {
     X86WriteError(),
     GeneratorError(String),
     VisitError(String),
+    NoneError(),
 }
 
 pub type DynoResult<T> = Result<T, DynoError>;
@@ -44,6 +45,7 @@ impl fmt::Display for DynoError {
             X86WriteError() => write!(f, "Error while writing x86 assembly"),
             GeneratorError(message) => write!(f, "Code generator error: {}", message),
             VisitError(message) => write!(f, "Visit error: {}", message),
+            NoneError() => write!(f, "None error"),
         }
     }
 }

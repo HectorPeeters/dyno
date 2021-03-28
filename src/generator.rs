@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
 use crate::types::DynoValue;
+use std::collections::VecDeque;
 use std::io::BufWriter;
 use std::io::Write;
 
@@ -70,7 +71,7 @@ impl From<usize> for Reg {
 }
 
 struct X86Generator {
-    writer: BufWriter<Vec<u8>>,
+    writer_stack: VecDeque<BufWriter<Vec<u8>>>,
     used_regs: Vec<bool>,
 }
 
@@ -78,8 +79,10 @@ const EXPRESSION_REGISTER_OFFSET: usize = 6;
 
 impl X86Generator {
     fn new() -> Self {
+        let mut deque = VecDeque::with_capacity(1);
+        deque.push_front(BufWriter::new(vec![]));
         Self {
-            writer: BufWriter::new(vec![]),
+            writer_stack: deque,
             used_regs: vec![false; 3],
         }
     }
@@ -110,7 +113,12 @@ impl X86Generator {
     }
 
     fn write(&mut self, data: &[u8]) -> DynoResult<()> {
-        match self.writer.write(data) {
+        let writer = self
+            .writer_stack
+            .front_mut()
+            .ok_or(DynoError::NoneError())?;
+
+        match writer.write(data) {
             Ok(_) => Ok(()),
             Err(_) => Err(DynoError::X86WriteError()),
         }
@@ -387,7 +395,12 @@ impl X86Generator {
 
         self.gen_single_node(ast)?;
 
-        Ok(self.writer.buffer().to_vec())
+        Ok(self
+            .writer_stack
+            .front()
+            .ok_or(DynoError::NoneError())?
+            .buffer()
+            .to_vec())
     }
 }
 
@@ -401,48 +414,59 @@ mod tests {
     use super::*;
     use crate::types::DynoType;
 
+    fn assert_buffer(gen: &X86Generator, buff: &[u8]) -> DynoResult<()> {
+        assert_eq!(
+            gen.writer_stack
+                .front()
+                .ok_or(DynoError::NoneError())?
+                .buffer(),
+            buff
+        );
+        Ok(())
+    }
+
     #[test]
     fn generator_new() {
         let _ = X86Generator::new();
     }
 
     #[test]
-    fn generator_write_u8() {
+    fn generator_write_u8() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
         generator.write_u8(12).unwrap();
-        assert_eq!(generator.writer.buffer(), &[12]);
+        assert_buffer(&generator, &[12])
     }
 
     #[test]
-    fn generator_write_u16() {
+    fn generator_write_u16() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
         generator.write_u16(0x1234).unwrap();
-        assert_eq!(generator.writer.buffer(), &[0x34, 0x12]);
+        assert_buffer(&generator, &[0x34, 0x12])
     }
 
     #[test]
-    fn generator_write_u32() {
+    fn generator_write_u32() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
         generator.write_u32(0x12345678).unwrap();
-        assert_eq!(generator.writer.buffer(), &[0x78, 0x56, 0x34, 0x12]);
+        assert_buffer(&generator, &[0x78, 0x56, 0x34, 0x12])
     }
 
     #[test]
-    fn generator_write_u64() {
+    fn generator_write_u64() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
         generator.write_u64(0x1234567812345678).unwrap();
-        assert_eq!(
-            generator.writer.buffer(),
-            &[0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12]
-        );
+        assert_buffer(
+            &generator,
+            &[0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12],
+        )
     }
 
     #[test]
-    fn generator_write_movq_reg_reg() {
+    fn generator_write_movq_reg_reg() -> DynoResult<()> {
         let mut generator = X86Generator::new();
 
         generator.write_movq_reg_reg(Reg::R15, Reg::R12).unwrap();
@@ -450,10 +474,12 @@ mod tests {
         generator.write_movq_reg_reg(Reg::R13, Reg::Rsi).unwrap();
         generator.write_movq_reg_reg(Reg::Rcx, Reg::Rdx).unwrap();
 
-        assert_eq!(
-            generator.writer.buffer(),
-            &[0x4D, 0x89, 0xFC, 0x49, 0x89, 0xDC, 0x4C, 0x89, 0xEE, 0x48, 0x89, 0xCA]
-        );
+        assert_buffer(
+            &generator,
+            &[
+                0x4D, 0x89, 0xFC, 0x49, 0x89, 0xDC, 0x4C, 0x89, 0xEE, 0x48, 0x89, 0xCA,
+            ],
+        )
     }
 
     #[test]
@@ -464,17 +490,16 @@ mod tests {
             generator.write_sete_reg(Reg::from(i))?;
         }
 
-        assert_eq!(
-            generator.writer.buffer(),
+        assert_buffer(
+            &generator,
             &[
                 0x40, 0x0F, 0x94, 0xC0, 0x40, 0x0F, 0x94, 0xC1, 0x40, 0x0F, 0x94, 0xC2, 0x40, 0x0F,
                 0x94, 0xC3, 0x40, 0x0F, 0x94, 0xC4, 0x40, 0x0F, 0x94, 0xC5, 0x40, 0x0F, 0x94, 0xC6,
                 0x40, 0x0F, 0x94, 0xC7, 0x41, 0x0F, 0x94, 0xC0, 0x41, 0x0F, 0x94, 0xC1, 0x41, 0x0F,
                 0x94, 0xC2, 0x41, 0x0F, 0x94, 0xC3, 0x41, 0x0F, 0x94, 0xC4, 0x41, 0x0F, 0x94, 0xC5,
-                0x41, 0x0F, 0x94, 0xC6, 0x41, 0x0F, 0x94, 0xC7
-            ]
-        );
-        Ok(())
+                0x41, 0x0F, 0x94, 0xC6, 0x41, 0x0F, 0x94, 0xC7,
+            ],
+        )
     }
 
     #[test]
@@ -485,21 +510,24 @@ mod tests {
             generator.write_movzx_reg(Reg::from(i))?;
         }
 
-        assert_eq!(
-            generator.writer.buffer(),
+        assert_buffer(
+            &generator,
             &[
                 0x48, 0x0F, 0xB6, 0xC0, 0x48, 0x0F, 0xB6, 0xC9, 0x48, 0x0F, 0xB6, 0xD2, 0x48, 0x0F,
                 0xB6, 0xDB, 0x48, 0x0F, 0xB6, 0xE4, 0x48, 0x0F, 0xB6, 0xED, 0x48, 0x0F, 0xB6, 0xF6,
                 0x48, 0x0F, 0xB6, 0xFF, 0x4D, 0x0F, 0xB6, 0xC0, 0x4D, 0x0F, 0xB6, 0xC9, 0x4D, 0x0F,
                 0xB6, 0xD2, 0x4D, 0x0F, 0xB6, 0xDB, 0x4D, 0x0F, 0xB6, 0xE4, 0x4D, 0x0F, 0xB6, 0xED,
-                0x4D, 0x0F, 0xB6, 0xF6, 0x4D, 0x0F, 0xB6, 0xFF
-            ]
-        );
-        Ok(())
+                0x4D, 0x0F, 0xB6, 0xF6, 0x4D, 0x0F, 0xB6, 0xFF,
+            ],
+        )
     }
 
     #[test]
     fn generator_write_single_int_literal() {
-        gen_assembly(AstNode::Return(Box::new(AstNode::Literal(DynoType::UInt16(), DynoValue::UInt(1234))))).unwrap();
+        gen_assembly(AstNode::Return(Box::new(AstNode::Literal(
+            DynoType::UInt16(),
+            DynoValue::UInt(1234),
+        ))))
+        .unwrap();
     }
 }
