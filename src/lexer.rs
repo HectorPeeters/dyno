@@ -1,15 +1,6 @@
 use crate::error::*;
-use logos::{Lexer, Logos};
+use logos::Logos;
 use std::ops::Range;
-
-fn parse_int_type(lex: &mut Lexer<TokenType>) -> Option<u8> {
-    let slice = lex.slice();
-    let size = slice[1..].parse().ok()?;
-    match size {
-        8 | 16 | 32 | 64 => Some(size),
-        _ => None,
-    }
-}
 
 #[derive(Logos, Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
@@ -21,10 +12,14 @@ pub enum TokenType {
     #[regex(r"return")]
     Return,
 
-    #[regex(r"u[0-9]+", parse_int_type)]
-    UnsignedIntType(u8),
-    #[regex(r"i[0-9]+", parse_int_type)]
-    SignedIntType(u8),
+    #[regex(r"u8")]
+    UInt8,
+    #[regex(r"u16")]
+    UInt16,
+    #[regex(r"u32")]
+    UInt32,
+    #[regex(r"u64")]
+    UInt64,
     #[regex(r"bool")]
     Bool,
 
@@ -144,6 +139,16 @@ mod tests {
     fn lexer_empty() {
         let tokens = get_tokens("");
         assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn lexer_int_types() {
+        let tokens = get_tokens("u8 u16 u32 u64");
+
+        assert_eq!(tokens[0].token_type, UInt8);
+        assert_eq!(tokens[1].token_type, UInt16);
+        assert_eq!(tokens[2].token_type, UInt32);
+        assert_eq!(tokens[3].token_type, UInt64);
     }
 
     #[test]

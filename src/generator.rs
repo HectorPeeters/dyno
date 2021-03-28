@@ -1,5 +1,6 @@
 use crate::ast::{AstNode, BinaryOperationType};
 use crate::error::*;
+use crate::types::DynoValue;
 use std::io::BufWriter;
 use std::io::Write;
 
@@ -329,11 +330,17 @@ impl X86Generator {
 
     fn gen_expression(&mut self, ast: &AstNode) -> DynoResult<Reg> {
         match ast {
-            AstNode::IntegerLiteral(value, _) => {
-                let reg = self.new_reg()?;
-                self.write_movq_imm_reg(*value as u64, reg)?;
-                Ok(reg)
-            }
+            AstNode::Literal(_, value) => match value {
+                DynoValue::UInt(x) => {
+                    let reg = self.new_reg()?;
+                    self.write_movq_imm_reg(*x as u64, reg)?;
+                    Ok(reg)
+                }
+                _ => Err(DynoError::GeneratorError(format!(
+                    "Cannot gen expression for {:?}",
+                    value
+                ))),
+            },
             AstNode::BinaryOperation(op_type, left, right) => {
                 let left_reg = self.gen_expression(left)?;
                 let right_reg = self.gen_expression(right)?;
@@ -392,6 +399,7 @@ pub fn gen_assembly(ast: AstNode) -> DynoResult<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::DynoType;
 
     #[test]
     fn generator_new() {
@@ -492,6 +500,6 @@ mod tests {
 
     #[test]
     fn generator_write_single_int_literal() {
-        gen_assembly(AstNode::Return(Box::new(AstNode::IntegerLiteral(1234, 8)))).unwrap();
+        gen_assembly(AstNode::Return(Box::new(AstNode::Literal(DynoType::UInt16(), DynoValue::UInt(1234))))).unwrap();
     }
 }

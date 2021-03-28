@@ -1,6 +1,6 @@
 use crate::error::*;
 use crate::lexer::TokenType;
-use crate::types::DynoType;
+use crate::types::{DynoType, DynoValue};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperationType {
@@ -19,7 +19,7 @@ pub enum BinaryOperationType {
 #[derive(Debug, PartialEq)]
 pub enum AstNode {
     BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
-    IntegerLiteral(u128, u8),
+    Literal(DynoType, DynoValue),
     Declaration(String, DynoType),
     Assignment(String, Box<AstNode>),
     Return(Box<AstNode>),
@@ -85,24 +85,30 @@ impl AstNode {
 
                 let left_type = left.get_type()?;
                 let right_type = right.get_type()?;
+                // TODO: this should probably get replaced by something better
                 match op {
                     Equal | NotEqual | LessThan | LessThanEqual | GreaterThan
-                    | GreaterThanEqual => match (left_type, right_type) {
-                        (DynoType::UnsignedInt(_), DynoType::UnsignedInt(_)) => {
+                    | GreaterThanEqual => {
+                        if left_type == right_type {
                             Ok(DynoType::Bool())
+                        } else {
+                            Err(DynoError::IncompatibleTypeError(left_type, right_type))
                         }
-
-                        (_, _) => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
-                    },
-                    _ => match (left_type, right_type) {
-                        (DynoType::UnsignedInt(l_size), DynoType::UnsignedInt(r_size)) => {
-                            Ok(DynoType::UnsignedInt(std::cmp::max(l_size, r_size)))
+                    }
+                    _ => {
+                        if left_type.is_int() && right_type.is_int() {
+                            if left_type.get_bits() > right_type.get_bits() {
+                                Ok(left_type)
+                            } else {
+                                Ok(right_type)
+                            }
+                        } else {
+                            Err(DynoError::IncompatibleTypeError(left_type, right_type))
                         }
-                        (_, _) => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
-                    },
+                    }
                 }
             }
-            AstNode::IntegerLiteral(_, size) => Ok(DynoType::UnsignedInt(*size)),
+            AstNode::Literal(value_type, _) => Ok(*value_type),
             _ => Ok(DynoType::Void()),
         }
     }
@@ -112,6 +118,7 @@ impl AstNode {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
+    use crate::types::{DynoType, DynoValue};
 
     #[test]
     fn test_precendence() {
@@ -129,14 +136,14 @@ mod tests {
     fn test_bin_op_size() {
         let ast = AstNode::BinaryOperation(
             Add,
-            Box::new(AstNode::IntegerLiteral(12, 4)),
+            Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
             Box::new(AstNode::BinaryOperation(
                 Multiply,
-                Box::new(AstNode::IntegerLiteral(4, 3)),
-                Box::new(AstNode::IntegerLiteral(7, 3)),
+                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(3))),
+                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
             )),
         );
 
-        assert_eq!(ast.get_type(), Ok(DynoType::UnsignedInt(4)));
+        assert_eq!(ast.get_type(), Ok(DynoType::UInt8()));
     }
 }
