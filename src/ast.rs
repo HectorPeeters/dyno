@@ -20,8 +20,10 @@ pub enum BinaryOperationType {
 pub enum AstNode {
     BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
     Literal(DynoType, DynoValue),
-    Declaration(String, DynoType),
-    Assignment(String, Box<AstNode>),
+    Declaration(Box<AstNode>, DynoType),
+    Assignment(Box<AstNode>, Box<AstNode>),
+    If(Box<AstNode>, Box<AstNode>),
+    Identifier(String),
     Return(Box<AstNode>),
     Block(Vec<AstNode>),
 }

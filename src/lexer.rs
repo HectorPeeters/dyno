@@ -11,6 +11,8 @@ pub enum TokenType {
     Let,
     #[regex(r"return")]
     Return,
+    #[regex(r"if")]
+    If,
 
     #[regex(r"u8")]
     UInt8,
@@ -63,6 +65,11 @@ pub enum TokenType {
     LeftParen,
     #[regex(r"\)")]
     RightParen,
+
+    #[regex(r"\{")]
+    LeftBrace,
+    #[regex(r"\}")]
+    RightBrace,
 
     #[error]
     Error,
