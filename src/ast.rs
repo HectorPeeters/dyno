@@ -17,15 +17,19 @@ pub enum BinaryOperationType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AstNode {
-    BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
+pub enum Expression {
+    BinaryOperation(BinaryOperationType, Box<Expression>, Box<Expression>),
     Literal(DynoType, DynoValue),
-    Declaration(Box<AstNode>, DynoType),
-    Assignment(Box<AstNode>, Box<AstNode>),
-    If(Box<AstNode>, Box<AstNode>),
     Identifier(String),
-    Return(Box<AstNode>),
-    Block(Vec<AstNode>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Statement {
+    Declaration(Expression, DynoType),
+    Assignment(Expression, Expression),
+    If(Expression, Box<Statement>),
+    Return(Expression),
+    Block(Vec<Statement>),
 }
 
 impl BinaryOperationType {
@@ -79,10 +83,10 @@ impl BinaryOperationType {
     }
 }
 
-impl AstNode {
+impl Expression {
     pub fn get_type(&self) -> DynoResult<DynoType> {
         match self {
-            AstNode::BinaryOperation(op, left, right) => {
+            Expression::BinaryOperation(op, left, right) => {
                 use BinaryOperationType::*;
 
                 let left_type = left.get_type()?;
@@ -110,7 +114,7 @@ impl AstNode {
                     }
                 }
             }
-            AstNode::Literal(value_type, _) => Ok(*value_type),
+            Expression::Literal(value_type, _) => Ok(*value_type),
             _ => Ok(DynoType::Void()),
         }
     }

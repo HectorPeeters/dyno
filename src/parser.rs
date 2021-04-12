@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, BinaryOperationType};
+use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
 use crate::lexer::{Token, TokenType};
 use crate::types::{DynoType, DynoValue};
@@ -57,7 +57,7 @@ impl Parser {
         self.index >= self.tokens.len()
     }
 
-    fn parse_integer_literal(&mut self) -> DynoResult<AstNode> {
+    fn parse_integer_literal(&mut self) -> DynoResult<Expression> {
         let token = self.consume_expect(TokenType::IntegerLiteral)?;
 
         let value = token.value.parse::<u64>();
@@ -72,18 +72,18 @@ impl Parser {
                     value_type = DynoType::UInt32();
                 }
 
-                Ok(AstNode::Literal(value_type, DynoValue::UInt(value)))
+                Ok(Expression::Literal(value_type, DynoValue::UInt(value)))
             }
             Err(_) => Err(DynoError::IntegerParseError(token.value.clone())),
         }
     }
 
-    fn parse_identifier(&mut self) -> DynoResult<AstNode> {
+    fn parse_identifier(&mut self) -> DynoResult<Expression> {
         let token = self.consume_expect(TokenType::Identifier)?;
-        Ok(AstNode::Identifier(token.value.clone()))
+        Ok(Expression::Identifier(token.value.clone()))
     }
 
-    fn parse_primary_expression(&mut self) -> DynoResult<AstNode> {
+    fn parse_primary_expression(&mut self) -> DynoResult<Expression> {
         use TokenType::*;
 
         let next = self.peek()?;
@@ -104,11 +104,11 @@ impl Parser {
         }
     }
 
-    fn parse_unary_expression(&mut self) -> DynoResult<AstNode> {
+    fn parse_unary_expression(&mut self) -> DynoResult<Expression> {
         self.parse_primary_expression()
     }
 
-    fn parse_expression(&mut self, precendence: u8) -> DynoResult<AstNode> {
+    fn parse_expression(&mut self, precendence: u8) -> DynoResult<Expression> {
         const DELIMETERS: [TokenType; 3] = [
             TokenType::SemiColon,
             TokenType::RightParen,
@@ -132,7 +132,7 @@ impl Parser {
 
             let right = self.parse_expression(current_precendence)?;
 
-            left = AstNode::BinaryOperation(operator_type, Box::new(left), Box::new(right));
+            left = Expression::BinaryOperation(operator_type, Box::new(left), Box::new(right));
 
             operator = self.peek()?;
 
@@ -165,42 +165,42 @@ impl Parser {
         }
     }
 
-    fn parse_declaration(&mut self) -> DynoResult<AstNode> {
+    fn parse_declaration(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::Let)?;
+
         let identifier = self.parse_identifier()?;
         self.consume_expect(TokenType::Colon)?;
+
         let variable_type = self.parse_type()?;
         self.consume_expect(TokenType::SemiColon)?;
-        Ok(AstNode::Declaration(Box::new(identifier), variable_type))
+
+        Ok(Statement::Declaration(identifier, variable_type))
     }
 
-    fn parse_assignment(&mut self) -> DynoResult<AstNode> {
+    fn parse_assignment(&mut self) -> DynoResult<Statement> {
         let identifier = self.parse_identifier()?;
         self.consume_expect(TokenType::Equals)?;
 
         let expression = self.parse_expression(0)?;
         self.consume_expect(TokenType::SemiColon)?;
 
-        Ok(AstNode::Assignment(
-            Box::new(identifier),
-            Box::new(expression),
-        ))
+        Ok(Statement::Assignment(identifier, expression))
     }
 
-    fn parse_return_statement(&mut self) -> DynoResult<AstNode> {
+    fn parse_return_statement(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::Return)?;
         let expression = self.parse_expression(0)?;
         self.consume_expect(TokenType::SemiColon)?;
 
-        Ok(AstNode::Return(Box::new(expression)))
+        Ok(Statement::Return(expression))
     }
 
-    fn parse_block(&mut self) -> DynoResult<AstNode> {
+    fn parse_block(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::LeftBrace)?;
 
         let mut statements = vec![];
         while self.peek()?.token_type != TokenType::RightBrace {
-            let statement = self.parse_single_node()?;
+            let statement = self.parse_statement()?;
             statements.push(statement);
         }
 
@@ -208,18 +208,18 @@ impl Parser {
         if statements.len() == 1 {
             Ok(statements.remove(0))
         } else {
-            Ok(AstNode::Block(statements))
+            Ok(Statement::Block(statements))
         }
     }
 
-    fn parse_if_statement(&mut self) -> DynoResult<AstNode> {
+    fn parse_if_statement(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::If)?;
         let condition = self.parse_expression(0)?;
         let true_node = self.parse_block()?;
-        Ok(AstNode::If(Box::new(condition), Box::new(true_node)))
+        Ok(Statement::If(condition, Box::new(true_node)))
     }
 
-    fn parse_single_node(&mut self) -> DynoResult<AstNode> {
+    fn parse_statement(&mut self) -> DynoResult<Statement> {
         match self.peek()?.token_type {
             TokenType::Let => self.parse_declaration(),
             TokenType::Return => self.parse_return_statement(),
@@ -240,19 +240,19 @@ impl Parser {
     }
 }
 
-pub fn parse(input: Vec<Token>) -> DynoResult<AstNode> {
+pub fn parse(input: Vec<Token>) -> DynoResult<Statement> {
     let mut parser = Parser::new(input);
 
-    let mut nodes: Vec<AstNode> = vec![];
+    let mut nodes: Vec<Statement> = vec![];
 
     while !parser.is_eof() {
-        let node = parser.parse_single_node()?;
+        let node = parser.parse_statement()?;
         nodes.push(node);
     }
 
     Ok(match nodes.len() {
         1 => nodes.remove(0),
-        _ => AstNode::Block(nodes),
+        _ => Statement::Block(nodes),
     })
 }
 

@@ -1,4 +1,4 @@
-use crate::ast::AstNode;
+use crate::ast::{Expression, Statement};
 use crate::error::*;
 use crate::types::*;
 use inkwell::builder::Builder;
@@ -33,31 +33,49 @@ impl CodeGenerator<'_> {
             ))),
         }
     }
-
-    fn generate(&self, ast: &AstNode) -> DynoResult<BasicValueEnum> {
-        match ast {
-            AstNode::Literal(literal_type, value) => self.generate_literal(&literal_type, &value),
-            AstNode::Return(x) => self.generate(x),
+    fn generate_expression(&self, expression: &Expression) -> DynoResult<BasicValueEnum> {
+        match expression {
+            Expression::Literal(literal_type, value) => {
+                self.generate_literal(&literal_type, &value)
+            }
             _ => Err(DynoError::GeneratorError(format!(
-                "Unknown ast value: {:?}",
-                ast
+                "Unknown expression to generate: {:?}",
+                expression
             ))),
         }
     }
 
-    pub fn jit_execute(&self, ast: &AstNode) -> DynoResult<u64> {
-        let value = self.generate(ast)?;
+    fn generate_return(&self, expression: &Expression) -> DynoResult<()> {
+        let expression_value = self.generate_expression(expression)?;
 
+        let i64_type = self.context.i64_type();
+        let return_value =
+            self.builder
+                .build_int_s_extend(expression_value.into_int_value(), i64_type, "");
+
+        self.builder.build_return(Some(&return_value));
+        Ok(())
+    }
+
+    fn generate_statement(&self, statement: &Statement) -> DynoResult<()> {
+        match statement {
+            Statement::Return(x) => self.generate_return(x),
+            _ => Err(DynoError::GeneratorError(format!(
+                "Unknown statement to generate: {:?}",
+                statement
+            ))),
+        }
+    }
+
+    pub fn jit_execute(&self, ast: &Statement) -> DynoResult<u64> {
         let i64_type = self.context.i64_type();
         let fn_type = i64_type.fn_type(&[], false);
         let function = self.module.add_function("main", fn_type, None);
         let basic_block = self.context.append_basic_block(function, "entry");
 
         self.builder.position_at_end(basic_block);
-        let return_value =
-            self.builder
-                .build_int_s_extend(value.into_int_value(), i64_type, "");
-        self.builder.build_return(Some(&return_value));
+
+        self.generate_statement(ast)?;
 
         unsafe {
             let function: JitFunction<MainFunc> =
@@ -68,7 +86,7 @@ impl CodeGenerator<'_> {
     }
 }
 
-pub fn compile_and_run(ast: &AstNode) -> DynoResult<u64> {
+pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
     let context = Context::create();
     let module = context.create_module("jit");
     let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
@@ -79,5 +97,5 @@ pub fn compile_and_run(ast: &AstNode) -> DynoResult<u64> {
         execution_engine,
     };
 
-    code_generator.jit_execute(ast)
+    code_generator.jit_execute(statement)
 }
