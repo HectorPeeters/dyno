@@ -27,8 +27,8 @@ pub enum Expression {
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
-    Declaration(Expression, DynoType),
-    Assignment(Expression, Expression),
+    Declaration(String, DynoType),
+    Assignment(String, Expression),
     If(Expression, Box<Statement>),
     Return(Expression),
     Block(Vec<Statement>),

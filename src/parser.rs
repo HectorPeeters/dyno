@@ -78,9 +78,9 @@ impl Parser {
         }
     }
 
-    fn parse_identifier(&mut self) -> DynoResult<Expression> {
+    fn parse_identifier(&mut self) -> DynoResult<String> {
         let token = self.consume_expect(TokenType::Identifier)?;
-        Ok(Expression::Identifier(token.value.clone()))
+        Ok(token.value.clone())
     }
 
     fn parse_primary_expression(&mut self) -> DynoResult<Expression> {
@@ -96,7 +96,7 @@ impl Parser {
                 self.consume_expect(RightParen)?;
                 Ok(expression)
             }
-            Identifier => self.parse_identifier(),
+            Identifier => Ok(Expression::Identifier(self.parse_identifier()?)),
             _ => Err(DynoError::UnexpectedTokenError(
                 next.token_type,
                 vec![IntegerLiteral, LeftParen, Identifier],
@@ -263,7 +263,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<Statement> {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
-    use crate::ast::Expression::{BinaryOperation, Identifier, Literal};
+    use crate::ast::Expression::{BinaryOperation, Literal};
     use crate::ast::Statement::{Assignment, Block, Declaration, If, Return};
     use crate::lexer::lex;
     use crate::lexer::TokenType::*;
@@ -373,20 +373,14 @@ mod tests {
     #[test]
     fn parse_simple_declaration() -> DynoResult<()> {
         let ast = get_statement("let a: u32;")?;
-        assert_eq!(
-            ast,
-            Declaration(Identifier("a".to_string()), DynoType::UInt32())
-        );
+        assert_eq!(ast, Declaration("a".to_string(), DynoType::UInt32()));
         Ok(())
     }
 
     #[test]
     fn parse_simple_boolean() -> DynoResult<()> {
         let ast = get_statement("let a: bool;")?;
-        assert_eq!(
-            ast,
-            Declaration(Identifier("a".to_string()), DynoType::Bool())
-        );
+        assert_eq!(ast, Declaration("a".to_string(), DynoType::Bool()));
         Ok(())
     }
 
@@ -397,9 +391,9 @@ mod tests {
         assert_eq!(
             ast,
             Block(vec![
-                Declaration(Identifier("a".to_string()), DynoType::UInt32()),
+                Declaration("a".to_string(), DynoType::UInt32()),
                 Assignment(
-                    Identifier("a".to_string()),
+                    "a".to_string(),
                     Literal(DynoType::UInt8(), DynoValue::UInt(12))
                 )
             ])
@@ -414,9 +408,9 @@ mod tests {
         assert_eq!(
             ast,
             Block(vec![
-                Declaration(Identifier("a".to_string()), DynoType::UInt32()),
+                Declaration("a".to_string(), DynoType::UInt32()),
                 Assignment(
-                    Identifier("a".to_string()),
+                    "a".to_string(),
                     BinaryOperation(
                         BinaryOperationType::Subtract,
                         Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),

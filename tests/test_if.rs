@@ -11,10 +11,10 @@ fn assert_run(input: &str, value: u64) -> DynoResult<()> {
 
 #[test]
 fn execute_simple_if() -> DynoResult<()> {
-    assert_run("let a: u32; a = 24; if 1 == 1 { a = 42; } return a;", 42)
+    assert_run("let a: u8; a = 24; if 1 == 1 { a = 42; } return a;", 42)
 }
 
 #[test]
 fn execute_simple_if_false() -> DynoResult<()> {
-    assert_run("let a: u32; a = 24; if 1 == 0 { a = 42; } return a;", 24)
+    assert_run("let a: u8; a = 24; if 1 == 0 { a = 42; } return a;", 24)
 }

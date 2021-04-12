@@ -5,10 +5,10 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
-use inkwell::values::FunctionValue;
-use inkwell::values::IntValue;
+use inkwell::values::{FunctionValue, IntValue, PointerValue};
 use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
+use std::collections::HashMap;
 
 type MainFunc = unsafe extern "C" fn() -> u64;
 
@@ -18,6 +18,7 @@ pub struct CodeGenerator<'a> {
     builder: Builder<'a>,
     execution_engine: ExecutionEngine<'a>,
     current_function: Option<FunctionValue<'a>>,
+    variables: HashMap<String, PointerValue<'a>>,
 }
 
 impl CodeGenerator<'_> {
@@ -102,6 +103,18 @@ impl CodeGenerator<'_> {
         llvm_type.map(|x| self.builder.build_int_z_extend(value, x, ""))
     }
 
+    fn generate_identifier_expression(&self, name: &str) -> DynoResult<IntValue> {
+        let variable = self
+            .variables
+            .get(name)
+            .ok_or(DynoError::GeneratorError(format!(
+                "Unknown variable: {}",
+                name
+            )))?;
+
+        Ok(self.builder.build_load(*variable, name).into_int_value())
+    }
+
     fn generate_expression(&self, expression: &Expression) -> DynoResult<IntValue> {
         match expression {
             Expression::Literal(literal_type, value) => {
@@ -111,10 +124,7 @@ impl CodeGenerator<'_> {
                 self.generate_binary_operation(&op, &left, &right)
             }
             Expression::Widen(value, widen_type) => self.generate_widen(&value, &widen_type),
-            _ => Err(DynoError::GeneratorError(format!(
-                "Unknown expression to generate: {:?}",
-                expression
-            ))),
+            Expression::Identifier(name) => self.generate_identifier_expression(name),
         }
     }
 
@@ -130,7 +140,11 @@ impl CodeGenerator<'_> {
         Ok(())
     }
 
-    fn generate_if(&self, condition: &Expression, true_statement: &Statement) -> DynoResult<()> {
+    fn generate_if(
+        &mut self,
+        condition: &Expression,
+        true_statement: &Statement,
+    ) -> DynoResult<()> {
         let condition_value = self.generate_expression(condition)?;
 
         let parent = self.current_function.unwrap();
@@ -155,7 +169,42 @@ impl CodeGenerator<'_> {
         Ok(())
     }
 
-    fn generate_statement(&self, statement: &Statement) -> DynoResult<()> {
+    fn generate_declaration(&mut self, variable: &str, value_type: &DynoType) -> DynoResult<()> {
+        let llvm_type = match value_type {
+            DynoType::UInt8() => self.context.i8_type(),
+            DynoType::UInt16() => self.context.i16_type(),
+            DynoType::UInt32() => self.context.i32_type(),
+            DynoType::UInt64() => self.context.i64_type(),
+            _ => panic!("Invalid dyno type for llvm: {:?}", value_type),
+        };
+
+        let alloca = self.builder.build_alloca(llvm_type, variable);
+
+        self.builder
+            .build_store(alloca, llvm_type.const_int(0, false));
+
+        self.variables.insert(variable.to_string(), alloca);
+
+        Ok(())
+    }
+
+    fn generate_assignment(&self, variable_name: &str, expression: &Expression) -> DynoResult<()> {
+        let variable = self
+            .variables
+            .get(variable_name)
+            .ok_or(DynoError::GeneratorError(format!(
+                "Unknown variable: {}",
+                variable_name
+            )))?;
+
+        let value = self.generate_expression(expression)?;
+
+        self.builder.build_store(*variable, value);
+
+        Ok(())
+    }
+
+    fn generate_statement(&mut self, statement: &Statement) -> DynoResult<()> {
         match statement {
             Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
             Statement::Return(x) => self.generate_return(x),
@@ -165,10 +214,8 @@ impl CodeGenerator<'_> {
                 }
                 Ok(())
             }
-            _ => Err(DynoError::GeneratorError(format!(
-                "Unknown statement to generate: {:?}",
-                statement
-            ))),
+            Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
+            Statement::Assignment(name, expression) => self.generate_assignment(name, expression),
         }
     }
 
@@ -202,6 +249,7 @@ pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
         builder: context.create_builder(),
         execution_engine,
         current_function: None,
+        variables: HashMap::new(),
     };
 
     code_generator.jit_execute(statement)
