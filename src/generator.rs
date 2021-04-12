@@ -5,7 +5,9 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
+use inkwell::values::FunctionValue;
 use inkwell::values::IntValue;
+use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
 
 type MainFunc = unsafe extern "C" fn() -> u64;
@@ -15,6 +17,7 @@ pub struct CodeGenerator<'a> {
     module: Module<'a>,
     builder: Builder<'a>,
     execution_engine: ExecutionEngine<'a>,
+    current_function: Option<FunctionValue<'a>>,
 }
 
 impl CodeGenerator<'_> {
@@ -60,6 +63,16 @@ impl CodeGenerator<'_> {
                 Ok(self
                     .builder
                     .build_int_unsigned_div(left_value, right_value, ""))
+            }
+            BinaryOperationType::Equal => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::EQ, left_value, right_value, ""))
+            }
+            BinaryOperationType::NotEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::NE, left_value, right_value, ""))
             }
             _ => Err(DynoError::GeneratorError(format!(
                 "Invalid binary operation: {:?}",
@@ -117,9 +130,41 @@ impl CodeGenerator<'_> {
         Ok(())
     }
 
+    fn generate_if(&self, condition: &Expression, true_statement: &Statement) -> DynoResult<()> {
+        let condition_value = self.generate_expression(condition)?;
+
+        let parent = self.current_function.unwrap();
+
+        let true_block = self.context.append_basic_block(parent, "true");
+        let false_block = self.context.append_basic_block(parent, "false");
+        let continue_block = self.context.append_basic_block(parent, "continue");
+
+        self.builder
+            .build_conditional_branch(condition_value, true_block, false_block);
+
+        self.builder.position_at_end(true_block);
+        self.generate_statement(true_statement)?;
+        self.builder.build_unconditional_branch(continue_block);
+
+        self.builder.position_at_end(false_block);
+        //TODO: add else here
+        self.builder.build_unconditional_branch(continue_block);
+
+        self.builder.position_at_end(continue_block);
+
+        Ok(())
+    }
+
     fn generate_statement(&self, statement: &Statement) -> DynoResult<()> {
         match statement {
+            Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
             Statement::Return(x) => self.generate_return(x),
+            Statement::Block(children) => {
+                for child in children {
+                    self.generate_statement(&child)?;
+                }
+                Ok(())
+            }
             _ => Err(DynoError::GeneratorError(format!(
                 "Unknown statement to generate: {:?}",
                 statement
@@ -127,7 +172,7 @@ impl CodeGenerator<'_> {
         }
     }
 
-    pub fn jit_execute(&self, ast: &Statement) -> DynoResult<u64> {
+    pub fn jit_execute(&mut self, ast: &Statement) -> DynoResult<u64> {
         let i64_type = self.context.i64_type();
         let fn_type = i64_type.fn_type(&[], false);
         let function = self.module.add_function("main", fn_type, None);
@@ -135,6 +180,7 @@ impl CodeGenerator<'_> {
 
         self.builder.position_at_end(basic_block);
 
+        self.current_function = Some(function);
         self.generate_statement(ast)?;
 
         unsafe {
@@ -150,11 +196,12 @@ pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
     let context = Context::create();
     let module = context.create_module("jit");
     let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
-    let code_generator = CodeGenerator {
+    let mut code_generator = CodeGenerator {
         context: &context,
         module,
         builder: context.create_builder(),
         execution_engine,
+        current_function: None,
     };
 
     code_generator.jit_execute(statement)
