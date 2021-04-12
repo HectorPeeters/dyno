@@ -124,6 +124,7 @@ impl Expression {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
+    use crate::ast::Expression::{BinaryOperation, Literal};
     use crate::types::{DynoType, DynoValue};
 
     #[test]
@@ -140,13 +141,13 @@ mod tests {
 
     #[test]
     fn test_bin_op_size() {
-        let ast = AstNode::BinaryOperation(
+        let ast = BinaryOperation(
             Add,
-            Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-            Box::new(AstNode::BinaryOperation(
+            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+            Box::new(BinaryOperation(
                 Multiply,
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(3))),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(3))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
             )),
         );
 

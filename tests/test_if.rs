@@ -1,14 +1,11 @@
 use dyno::error::DynoResult;
-use dyno::generator::gen_assembly;
-use dyno::jit::Jit;
+use dyno::generator::compile_and_run;
 use dyno::lexer::lex;
 use dyno::parser::parse;
 
 fn assert_run(input: &str, value: u64) -> DynoResult<()> {
-    let asm = gen_assembly(parse(lex(input)?)?)?;
-    println!("{:02x?}", asm);
-    let jit = Jit::new(&asm);
-    assert_eq!(jit.run(), value);
+    let result = compile_and_run(&parse(lex(input)?)?)?;
+    assert_eq!(result, value);
     Ok(())
 }
 

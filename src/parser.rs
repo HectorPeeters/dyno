@@ -260,6 +260,8 @@ pub fn parse(input: Vec<Token>) -> DynoResult<Statement> {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
+    use crate::ast::Expression::{BinaryOperation, Identifier, Literal};
+    use crate::ast::Statement::{Assignment, Block, Declaration, If, Return};
     use crate::lexer::lex;
     use crate::lexer::TokenType::*;
 
@@ -301,19 +303,19 @@ mod tests {
         assert!(parser.consume().is_err());
     }
 
-    fn get_ast(text: &str) -> DynoResult<AstNode> {
+    fn get_statement(text: &str) -> DynoResult<Statement> {
         parse(lex(text)?)
     }
 
     #[test]
     fn parser_basic_binary_op() -> DynoResult<()> {
         assert_eq!(
-            get_ast("return 12 + 4;")?,
-            AstNode::Return(Box::new(AstNode::BinaryOperation(
+            get_statement("return 12 + 4;")?,
+            Return(BinaryOperation(
                 Add,
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(12))),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-            )))
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+            ))
         );
         Ok(())
     }
@@ -321,16 +323,16 @@ mod tests {
     #[test]
     fn parser_precendence_a() -> DynoResult<()> {
         assert_eq!(
-            get_ast("return 12 + 4 * 7;")?,
-            AstNode::Return(Box::new(AstNode::BinaryOperation(
+            get_statement("return 12 + 4 * 7;")?,
+            Return(BinaryOperation(
                 Add,
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(12))),
-                Box::new(AstNode::BinaryOperation(
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                Box::new(BinaryOperation(
                     Multiply,
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(7))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(7))),
                 )),
-            )))
+            ))
         );
         Ok(())
     }
@@ -338,16 +340,16 @@ mod tests {
     #[test]
     fn parser_precendence_b() -> DynoResult<()> {
         assert_eq!(
-            get_ast("return 12 * 4 + 7;")?,
-            AstNode::Return(Box::new(AstNode::BinaryOperation(
+            get_statement("return 12 * 4 + 7;")?,
+            Return(BinaryOperation(
                 Add,
-                Box::new(AstNode::BinaryOperation(
+                Box::new(BinaryOperation(
                     Multiply,
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(12))),
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
                 )),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(7))),
-            )))
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(7))),
+            ))
         );
         Ok(())
     }
@@ -355,56 +357,47 @@ mod tests {
     #[test]
     fn parse_equals_operator() -> DynoResult<()> {
         assert_eq!(
-            get_ast("return 1 == 2;")?,
-            AstNode::Return(Box::new(AstNode::BinaryOperation(
+            get_statement("return 1 == 2;")?,
+            Return(BinaryOperation(
                 Equal,
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(1))),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
-            )))
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(1))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+            ))
         );
         Ok(())
     }
 
     #[test]
     fn parse_simple_declaration() -> DynoResult<()> {
-        let ast = get_ast("let a: u32;")?;
+        let ast = get_statement("let a: u32;")?;
         assert_eq!(
             ast,
-            AstNode::Declaration(
-                Box::new(AstNode::Identifier("a".to_string())),
-                DynoType::UInt32()
-            )
+            Declaration(Identifier("a".to_string()), DynoType::UInt32())
         );
         Ok(())
     }
 
     #[test]
     fn parse_simple_boolean() -> DynoResult<()> {
-        let ast = get_ast("let a: bool;")?;
+        let ast = get_statement("let a: bool;")?;
         assert_eq!(
             ast,
-            AstNode::Declaration(
-                Box::new(AstNode::Identifier("a".to_string())),
-                DynoType::Bool()
-            )
+            Declaration(Identifier("a".to_string()), DynoType::Bool())
         );
         Ok(())
     }
 
     #[test]
     fn parser_simple_assignment() -> DynoResult<()> {
-        let ast = get_ast("let a: u32; a = 12;")?;
+        let ast = get_statement("let a: u32; a = 12;")?;
 
         assert_eq!(
             ast,
-            AstNode::Block(vec![
-                AstNode::Declaration(
-                    Box::new(AstNode::Identifier("a".to_string())),
-                    DynoType::UInt32()
-                ),
-                AstNode::Assignment(
-                    Box::new(AstNode::Identifier("a".to_string())),
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(12)))
+            Block(vec![
+                Declaration(Identifier("a".to_string()), DynoType::UInt32()),
+                Assignment(
+                    Identifier("a".to_string()),
+                    Literal(DynoType::UInt8(), DynoValue::UInt(12))
                 )
             ])
         );
@@ -413,26 +406,23 @@ mod tests {
 
     #[test]
     fn parser_complex_assignment() -> DynoResult<()> {
-        let ast = get_ast("let a: u32; a = 12 - 2 * 4;")?;
+        let ast = get_statement("let a: u32; a = 12 - 2 * 4;")?;
 
         assert_eq!(
             ast,
-            AstNode::Block(vec![
-                AstNode::Declaration(
-                    Box::new(AstNode::Identifier("a".to_string())),
-                    DynoType::UInt32()
-                ),
-                AstNode::Assignment(
-                    Box::new(AstNode::Identifier("a".to_string())),
-                    Box::new(AstNode::BinaryOperation(
+            Block(vec![
+                Declaration(Identifier("a".to_string()), DynoType::UInt32()),
+                Assignment(
+                    Identifier("a".to_string()),
+                    BinaryOperation(
                         BinaryOperationType::Subtract,
-                        Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(12))),
-                        Box::new(AstNode::BinaryOperation(
+                        Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                        Box::new(BinaryOperation(
                             BinaryOperationType::Multiply,
-                            Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
-                            Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
                         ))
-                    ))
+                    )
                 )
             ])
         );
@@ -441,54 +431,42 @@ mod tests {
 
     #[test]
     fn parse_simple_parentheses() -> DynoResult<()> {
-        let ast = get_ast("return (12);")?;
-        assert_eq!(
-            ast,
-            AstNode::Return(Box::new(AstNode::Literal(
-                DynoType::UInt8(),
-                DynoValue::UInt(12)
-            )))
-        );
+        let ast = get_statement("return (12);")?;
+        assert_eq!(ast, Return(Literal(DynoType::UInt8(), DynoValue::UInt(12))));
         Ok(())
     }
 
     #[test]
     fn parse_parentheses_expression() -> DynoResult<()> {
-        use AstNode::*;
-        use BinaryOperationType::*;
-        let ast = get_ast("return (4 + 2) * 3;")?;
+        let ast = get_statement("return (4 + 2) * 3;")?;
         assert_eq!(
             ast,
-            Return(Box::new(BinaryOperation(
+            Return(BinaryOperation(
                 Multiply,
                 Box::new(BinaryOperation(
                     Add,
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-                    Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                    Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
                 )),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(3))),
-            )))
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(3))),
+            ))
         );
         Ok(())
     }
 
     #[test]
     fn parse_simple_if() -> DynoResult<()> {
-        use AstNode::*;
-        let ast = get_ast("if 1 == 2 { return 3; }")?;
+        let ast = get_statement("if 1 == 2 { return 3; }")?;
 
         assert_eq!(
             ast,
             If(
-                Box::new(BinaryOperation(
+                BinaryOperation(
                     BinaryOperationType::Equal,
                     Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(1))),
                     Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2)))
-                )),
-                Box::new(Return(Box::new(Literal(
-                    DynoType::UInt8(),
-                    DynoValue::UInt(3)
-                ))))
+                ),
+                Box::new(Return(Literal(DynoType::UInt8(), DynoValue::UInt(3))))
             )
         );
         Ok(())
