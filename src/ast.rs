@@ -126,6 +126,21 @@ impl Expression {
         }
     }
 
+    pub fn make_assignment_compatible(
+        left_type: DynoType,
+        right: Expression,
+    ) -> DynoResult<Expression> {
+        let right_type = right.get_type()?;
+        let left_size = left_type.get_bits();
+        let right_size = right_type.get_bits();
+
+        match left_size.cmp(&right_size) {
+            Ordering::Greater => Ok(Expression::Widen(Box::new(right), left_type)),
+            Ordering::Less => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
+            Ordering::Equal => Ok(right),
+        }
+    }
+
     pub fn get_type(&self) -> DynoResult<DynoType> {
         match self {
             Expression::BinaryOperation(op, left, right) => {

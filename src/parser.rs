@@ -2,15 +2,21 @@ use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
 use crate::lexer::{Token, TokenType};
 use crate::types::{DynoType, DynoValue};
+use std::collections::HashMap;
 
 struct Parser {
     tokens: Vec<Token>,
     index: usize,
+    variable_scope: Vec<HashMap<String, DynoType>>,
 }
 
 impl Parser {
     fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, index: 0 }
+        Self {
+            tokens,
+            index: 0,
+            variable_scope: vec![HashMap::new()],
+        }
     }
 
     fn peek(&self) -> DynoResult<&Token> {
@@ -19,6 +25,48 @@ impl Parser {
         }
 
         Ok(&self.tokens[self.index])
+    }
+
+    fn insert_variable(&mut self, name: &str, variable_type: DynoType) -> DynoResult<()> {
+        let scope_count = self.variable_scope.len();
+        let last_scope = &mut self.variable_scope[scope_count - 1];
+
+        if last_scope.contains_key(name) {
+            return Err(DynoError::IdentifierError(format!(
+                "Identifier already defined: {}",
+                name,
+            )));
+        }
+
+        last_scope.insert(name.to_owned(), variable_type);
+        Ok(())
+    }
+
+    fn push_scope(&mut self) {
+        self.variable_scope.push(HashMap::new());
+    }
+
+    fn pop_scope(&mut self) -> DynoResult<()> {
+        match self.variable_scope.pop() {
+            Some(_) => Ok(()),
+            None => Err(DynoError::IdentifierError(
+                "Tried popping while scope stack was empty".to_string(),
+            )),
+        }
+    }
+
+    fn find_variable(&mut self, name: &str) -> DynoResult<DynoType> {
+        for scope in self.variable_scope.iter().rev() {
+            match scope.get(name) {
+                Some(x) => return Ok(*x),
+                None => continue,
+            }
+        }
+
+        Err(DynoError::IdentifierError(format!(
+            "Identifier `{}` not found",
+            name
+        )))
     }
 
     #[allow(dead_code)]
@@ -177,6 +225,8 @@ impl Parser {
         let variable_type = self.parse_type()?;
         self.consume_expect(TokenType::SemiColon)?;
 
+        self.insert_variable(&identifier, variable_type)?;
+
         Ok(Statement::Declaration(identifier, variable_type))
     }
 
@@ -187,7 +237,12 @@ impl Parser {
         let expression = self.parse_expression(0)?;
         self.consume_expect(TokenType::SemiColon)?;
 
-        Ok(Statement::Assignment(identifier, expression))
+        let variable_type = self.find_variable(&identifier)?;
+
+        Ok(Statement::Assignment(
+            identifier,
+            Expression::make_assignment_compatible(variable_type, expression)?,
+        ))
     }
 
     fn parse_return_statement(&mut self) -> DynoResult<Statement> {
@@ -201,11 +256,15 @@ impl Parser {
     fn parse_block(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::LeftBrace)?;
 
+        self.push_scope();
+
         let mut statements = vec![];
         while self.peek()?.token_type != TokenType::RightBrace {
             let statement = self.parse_statement()?;
             statements.push(statement);
         }
+
+        self.pop_scope()?;
 
         self.consume_expect(TokenType::RightBrace)?;
         if statements.len() == 1 {
@@ -263,7 +322,7 @@ pub fn parse(input: Vec<Token>) -> DynoResult<Statement> {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
-    use crate::ast::Expression::{BinaryOperation, Literal};
+    use crate::ast::Expression::{BinaryOperation, Literal, Widen};
     use crate::ast::Statement::{Assignment, Block, Declaration, If, Return};
     use crate::lexer::lex;
     use crate::lexer::TokenType::*;
@@ -394,7 +453,10 @@ mod tests {
                 Declaration("a".to_string(), DynoType::UInt32()),
                 Assignment(
                     "a".to_string(),
-                    Literal(DynoType::UInt8(), DynoValue::UInt(12))
+                    Widen(
+                        Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                        DynoType::UInt32()
+                    )
                 )
             ])
         );
@@ -411,14 +473,17 @@ mod tests {
                 Declaration("a".to_string(), DynoType::UInt32()),
                 Assignment(
                     "a".to_string(),
-                    BinaryOperation(
-                        BinaryOperationType::Subtract,
-                        Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                    Widen(
                         Box::new(BinaryOperation(
-                            BinaryOperationType::Multiply,
-                            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
-                            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-                        ))
+                            BinaryOperationType::Subtract,
+                            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
+                            Box::new(BinaryOperation(
+                                BinaryOperationType::Multiply,
+                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                            ))
+                        )),
+                        DynoType::UInt32()
                     )
                 )
             ])

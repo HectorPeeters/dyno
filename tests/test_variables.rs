@@ -13,7 +13,7 @@ fn assert_run(input: &str, value: u64) -> DynoResult<()> {
 fn execute_declare_and_assign() -> DynoResult<()> {
     assert_run(
         r"
-        let x: u8;
+        let x: u32;
         x = 13;
         return x; 
                ",
