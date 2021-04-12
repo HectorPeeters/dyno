@@ -608,4 +608,11 @@ mod tests {
 
         assert!(node.is_err());
     }
+
+    #[test]
+    fn parser_assign_variable_too_big_error() -> DynoResult<()> {
+        let result = parse(lex("{let a: u8; a = 256;}")?);
+        assert!(result.is_err());
+        Ok(())
+    }
 }
