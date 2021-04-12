@@ -16,7 +16,7 @@ pub enum DynoError {
     VisitError(String),
     NoneError(),
     IntoInnerError(),
-    LLVMError(String),
+    LlvmError(String),
 }
 
 impl<T> From<std::io::IntoInnerError<T>> for DynoError {
@@ -27,7 +27,7 @@ impl<T> From<std::io::IntoInnerError<T>> for DynoError {
 
 impl From<inkwell::support::LLVMString> for DynoError {
     fn from(error: inkwell::support::LLVMString) -> Self {
-        DynoError::LLVMError(error.to_string())
+        DynoError::LlvmError(error.to_string())
     }
 }
 
@@ -61,7 +61,7 @@ impl fmt::Display for DynoError {
             VisitError(message) => write!(f, "Visit error: {}", message),
             NoneError() => write!(f, "None error"),
             IntoInnerError() => write!(f, "Into inner error"),
-            LLVMError(message) => write!(f, "LLVM error: {}", message),
+            LlvmError(message) => write!(f, "LLVM error: {}", message),
         }
     }
 }

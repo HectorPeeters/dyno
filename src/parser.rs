@@ -131,8 +131,11 @@ impl Parser {
             self.consume_expect(token_type)?;
 
             let right = self.parse_expression(current_precendence)?;
+            let left_type = left.get_type()?;
+            let right_type = right.get_type()?;
 
-            left = Expression::BinaryOperation(operator_type, Box::new(left), Box::new(right));
+            left = Expression::make_binop_compatible(operator_type, left, right)?
+                .ok_or(DynoError::IncompatibleTypeError(left_type, right_type))?;
 
             operator = self.peek()?;
 

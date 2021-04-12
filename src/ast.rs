@@ -1,6 +1,7 @@
 use crate::error::*;
 use crate::lexer::TokenType;
 use crate::types::{DynoType, DynoValue};
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperationType {
@@ -20,6 +21,7 @@ pub enum BinaryOperationType {
 pub enum Expression {
     BinaryOperation(BinaryOperationType, Box<Expression>, Box<Expression>),
     Literal(DynoType, DynoValue),
+    Widen(Box<Expression>, DynoType),
     Identifier(String),
 }
 
@@ -84,6 +86,46 @@ impl BinaryOperationType {
 }
 
 impl Expression {
+    pub fn make_binop_compatible(
+        op_type: BinaryOperationType,
+        left: Expression,
+        right: Expression,
+    ) -> DynoResult<Option<Expression>> {
+        match op_type {
+            BinaryOperationType::Add
+            | BinaryOperationType::Subtract
+            | BinaryOperationType::Multiply
+            | BinaryOperationType::Divide
+            | BinaryOperationType::Equal
+            | BinaryOperationType::NotEqual
+            | BinaryOperationType::LessThan
+            | BinaryOperationType::LessThanEqual
+            | BinaryOperationType::GreaterThan
+            | BinaryOperationType::GreaterThanEqual => {
+                let left_type = left.get_type()?;
+                let right_type = right.get_type()?;
+                let left_size = left_type.get_bits();
+                let right_size = right_type.get_bits();
+
+                Ok(Some(match left_size.cmp(&right_size) {
+                    Ordering::Less => Expression::BinaryOperation(
+                        op_type,
+                        Box::new(Expression::Widen(Box::new(left), right_type)),
+                        Box::new(right),
+                    ),
+                    Ordering::Greater => Expression::BinaryOperation(
+                        op_type,
+                        Box::new(left),
+                        Box::new(Expression::Widen(Box::new(right), left_type)),
+                    ),
+                    Ordering::Equal => {
+                        Expression::BinaryOperation(op_type, Box::new(left), Box::new(right))
+                    }
+                }))
+            }
+        }
+    }
+
     pub fn get_type(&self) -> DynoResult<DynoType> {
         match self {
             Expression::BinaryOperation(op, left, right) => {
