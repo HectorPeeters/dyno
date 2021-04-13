@@ -55,3 +55,11 @@ impl<T> Scope<T> where T: Copy{
         )))
     }
 }
+
+impl<T> Default for Scope<T> where T: Copy {
+    fn default() -> Self {
+        Self {
+            items: vec![HashMap::new()],
+        }
+    } 
+}

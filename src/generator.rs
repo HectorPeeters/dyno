@@ -107,10 +107,7 @@ impl CodeGenerator<'_> {
         let variable = self
             .variables
             .get(name)
-            .ok_or(DynoError::GeneratorError(format!(
-                "Unknown variable: {}",
-                name
-            )))?;
+            .ok_or_else(|| DynoError::GeneratorError(format!("Unknown variable: {}", name)))?;
 
         Ok(self.builder.build_load(*variable, name).into_int_value())
     }
@@ -195,7 +192,7 @@ impl CodeGenerator<'_> {
         let variable = self
             .variables
             .get(variable_name)
-            .ok_or(DynoError::GeneratorError(format!(
+            .ok_or_else(||DynoError::GeneratorError(format!(
                 "Unknown variable: {}",
                 variable_name
             )))?;
