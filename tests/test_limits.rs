@@ -49,3 +49,41 @@ fn limits_u16() -> DynoResult<()> {
     //        65535,
     //    )
 }
+
+#[test]
+fn limits_u32() -> DynoResult<()> {
+    assert_run(
+        r"
+        let x: u32;
+        x = 4294967295 + 1;
+        return x;",
+        0,
+    )
+
+    //    assert_run(
+    //        r"
+    //        let x: u32;
+    //        x = 0 - 1;
+    //        return x;",
+    //        4294967295,
+    //    )
+}
+
+#[test]
+fn limits_u64() -> DynoResult<()> {
+    assert_run(
+        r"
+        let x: u64;
+        x = 18446744073709551615 + 1;
+        return x;",
+        0,
+    )
+
+    //    assert_run(
+    //        r"
+    //        let x: u64;
+    //        x = 0 - 1;
+    //        return x;",
+    //        4294967295,
+    //    )
+}

@@ -493,6 +493,20 @@ mod tests {
     }
 
     #[test]
+    fn parser_reassign_variable_different_scope() -> DynoResult<()> {
+        let result = parse(lex("{let a: u8; {let a: u32;}}")?)?;
+        assert_eq!(
+            result,
+            Block(vec![
+                Declaration("a".to_owned(), DynoType::UInt8()),
+                Declaration("a".to_owned(), DynoType::UInt32())
+            ])
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn parser_consume_out_of_bounds_error() {
         let mut parser = Parser::new(vec![]);
         let token = parser.consume();
@@ -570,6 +584,13 @@ mod tests {
     #[test]
     fn parser_assign_variable_too_big_error() -> DynoResult<()> {
         let result = parse(lex("{let a: u8; a = 256;}")?);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn parser_reassign_variable() -> DynoResult<()> {
+        let result = parse(lex("{let a: u8; let a: u32;}")?);
         assert!(result.is_err());
         Ok(())
     }
