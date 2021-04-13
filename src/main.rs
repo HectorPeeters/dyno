@@ -2,6 +2,7 @@
 
 mod ast;
 mod elf;
+mod scope;
 mod error;
 mod generator;
 mod lexer;

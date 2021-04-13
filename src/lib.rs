@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod scope;
 pub mod elf;
 pub mod error;
 pub mod generator;

@@ -1,13 +1,13 @@
 use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
 use crate::lexer::{Token, TokenType};
+use crate::scope::Scope;
 use crate::types::{DynoType, DynoValue};
-use std::collections::HashMap;
 
 struct Parser {
     tokens: Vec<Token>,
     index: usize,
-    variable_scope: Vec<HashMap<String, DynoType>>,
+    variable_scope: Scope<DynoType>,
 }
 
 impl Parser {
@@ -15,7 +15,7 @@ impl Parser {
         Self {
             tokens,
             index: 0,
-            variable_scope: vec![HashMap::new()],
+            variable_scope: Scope::new(),
         }
     }
 
@@ -25,48 +25,6 @@ impl Parser {
         }
 
         Ok(&self.tokens[self.index])
-    }
-
-    fn insert_variable(&mut self, name: &str, variable_type: DynoType) -> DynoResult<()> {
-        let scope_count = self.variable_scope.len();
-        let last_scope = &mut self.variable_scope[scope_count - 1];
-
-        if last_scope.contains_key(name) {
-            return Err(DynoError::IdentifierError(format!(
-                "Identifier already defined: {}",
-                name,
-            )));
-        }
-
-        last_scope.insert(name.to_owned(), variable_type);
-        Ok(())
-    }
-
-    fn push_scope(&mut self) {
-        self.variable_scope.push(HashMap::new());
-    }
-
-    fn pop_scope(&mut self) -> DynoResult<()> {
-        match self.variable_scope.pop() {
-            Some(_) => Ok(()),
-            None => Err(DynoError::IdentifierError(
-                "Tried popping while scope stack was empty".to_string(),
-            )),
-        }
-    }
-
-    fn find_variable(&mut self, name: &str) -> DynoResult<DynoType> {
-        for scope in self.variable_scope.iter().rev() {
-            match scope.get(name) {
-                Some(x) => return Ok(*x),
-                None => continue,
-            }
-        }
-
-        Err(DynoError::IdentifierError(format!(
-            "Identifier `{}` not found",
-            name
-        )))
     }
 
     #[allow(dead_code)]
@@ -225,7 +183,7 @@ impl Parser {
         let variable_type = self.parse_type()?;
         self.consume_expect(TokenType::SemiColon)?;
 
-        self.insert_variable(&identifier, variable_type)?;
+        self.variable_scope.insert(&identifier, variable_type)?;
 
         Ok(Statement::Declaration(identifier, variable_type))
     }
@@ -237,7 +195,7 @@ impl Parser {
         let expression = self.parse_expression(0)?;
         self.consume_expect(TokenType::SemiColon)?;
 
-        let variable_type = self.find_variable(&identifier)?;
+        let variable_type = self.variable_scope.find(&identifier)?;
 
         Ok(Statement::Assignment(
             identifier,
@@ -256,7 +214,7 @@ impl Parser {
     fn parse_block(&mut self) -> DynoResult<Statement> {
         self.consume_expect(TokenType::LeftBrace)?;
 
-        self.push_scope();
+        self.variable_scope.push();
 
         let mut statements = vec![];
         while self.peek()?.token_type != TokenType::RightBrace {
@@ -264,7 +222,7 @@ impl Parser {
             statements.push(statement);
         }
 
-        self.pop_scope()?;
+        self.variable_scope.pop()?;
 
         self.consume_expect(TokenType::RightBrace)?;
         if statements.len() == 1 {
