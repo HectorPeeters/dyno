@@ -1,14 +1,7 @@
-use dyno::error::DynoResult;
-use dyno::generator::compile_and_run;
-use dyno::lexer::lex;
-use dyno::parser::parse;
+mod common;
+use common::assert_run;
 
-fn assert_run(input: &str, value: u64) -> DynoResult<()> {
-    println!("{:#?}", parse(lex(input)?)?);
-    let result = compile_and_run(&parse(lex(input)?)?)?;
-    assert_eq!(result, value);
-    Ok(())
-}
+use dyno::error::DynoResult;
 
 #[test]
 fn limits_u8() -> DynoResult<()> {

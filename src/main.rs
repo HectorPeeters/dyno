@@ -1,14 +1,6 @@
 #![allow(dead_code)]
 
-mod ast;
-mod elf;
-mod scope;
-mod error;
-mod generator;
-mod lexer;
-mod parser;
-mod types;
-
+use dyno::*;
 use std::env;
 use std::io::{stdin, stdout, Write};
 
