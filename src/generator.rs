@@ -98,9 +98,9 @@ impl CodeGenerator<'_> {
                 "Cannot widen: {:?}",
                 expression
             ))),
-        };
+        }?;
 
-        llvm_type.map(|x| self.builder.build_int_z_extend(value, x, ""))
+        Ok(self.builder.build_int_z_extend(value, llvm_type, ""))
     }
 
     fn generate_identifier_expression(&self, name: &str) -> DynoResult<IntValue> {
@@ -134,7 +134,7 @@ impl CodeGenerator<'_> {
         let i64_type = self.context.i64_type();
         let return_value = self
             .builder
-            .build_int_s_extend(expression_value, i64_type, "");
+            .build_int_z_extend(expression_value, i64_type, "");
 
         self.builder.build_return(Some(&return_value));
         Ok(())
@@ -171,12 +171,15 @@ impl CodeGenerator<'_> {
 
     fn generate_declaration(&mut self, variable: &str, value_type: &DynoType) -> DynoResult<()> {
         let llvm_type = match value_type {
-            DynoType::UInt8() => self.context.i8_type(),
-            DynoType::UInt16() => self.context.i16_type(),
-            DynoType::UInt32() => self.context.i32_type(),
-            DynoType::UInt64() => self.context.i64_type(),
-            _ => panic!("Invalid dyno type for llvm: {:?}", value_type),
-        };
+            DynoType::UInt8() => Ok(self.context.i8_type()),
+            DynoType::UInt16() => Ok(self.context.i16_type()),
+            DynoType::UInt32() => Ok(self.context.i32_type()),
+            DynoType::UInt64() => Ok(self.context.i64_type()),
+            _ => Err(DynoError::GeneratorError(format!(
+                "Invalid dyno type for llvm declaration: {:?}",
+                value_type
+            ))),
+        }?;
 
         let alloca = self.builder.build_alloca(llvm_type, variable);
 

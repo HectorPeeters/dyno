@@ -159,12 +159,11 @@ impl Expression {
                         }
                     }
                     _ => {
-                        if left_type.is_int() && right_type.is_int() {
-                            if left_type.get_bits() > right_type.get_bits() {
-                                Ok(left_type)
-                            } else {
-                                Ok(right_type)
-                            }
+                        if left_type.is_int()
+                            && right_type.is_int()
+                            && (left_type.get_bits() == right_type.get_bits())
+                        {
+                            Ok(left_type)
                         } else {
                             Err(DynoError::IncompatibleTypeError(left_type, right_type))
                         }
@@ -172,7 +171,8 @@ impl Expression {
                 }
             }
             Expression::Literal(value_type, _) => Ok(*value_type),
-            _ => Ok(DynoType::Void()),
+            Expression::Widen(_, value_type) => Ok(*value_type),
+            _ => unreachable!(),
         }
     }
 }
