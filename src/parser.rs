@@ -72,9 +72,9 @@ impl Parser {
                 let mut value_type = DynoType::UInt64();
                 if value < 2_u64.pow(8) {
                     value_type = DynoType::UInt8();
-                } else if value < 16_u64.pow(8) {
+                } else if value < 2_u64.pow(16) {
                     value_type = DynoType::UInt16();
-                } else if value < 32_u64.pow(8) {
+                } else if value < 2_u64.pow(32) {
                     value_type = DynoType::UInt32();
                 }
 
@@ -431,18 +431,24 @@ mod tests {
                 Declaration("a".to_string(), DynoType::UInt32()),
                 Assignment(
                     "a".to_string(),
-                    Widen(
-                        Box::new(BinaryOperation(
-                            BinaryOperationType::Subtract,
+                    BinaryOperation(
+                        BinaryOperationType::Subtract,
+                        Box::new(Widen(
                             Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(12))),
-                            Box::new(BinaryOperation(
-                                BinaryOperationType::Multiply,
-                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
-                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-                            ))
+                            DynoType::UInt32()
                         )),
-                        DynoType::UInt32()
-                    )
+                        Box::new(BinaryOperation(
+                            BinaryOperationType::Multiply,
+                            Box::new(Widen(
+                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                                DynoType::UInt32()
+                            )),
+                            Box::new(Widen(
+                                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+                                DynoType::UInt32()
+                            )),
+                        ))
+                    ),
                 )
             ])
         );

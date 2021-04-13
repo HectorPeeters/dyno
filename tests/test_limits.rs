@@ -25,8 +25,7 @@ fn limits_u8() -> DynoResult<()> {
         r"
         let x: u8;
         x = 0 - 1;
-        return x; 
-               ",
+        return x;",
         255,
     )
 }
@@ -39,15 +38,15 @@ fn limits_u16() -> DynoResult<()> {
         x = 65535 + 1;
         return x;",
         0,
-    )
+    )?;
 
-    //    assert_run(
-    //        r"
-    //        let x: u16;
-    //        x = 0 - 1;
-    //        return x;",
-    //        65535,
-    //    )
+    assert_run(
+        r"
+        let x: u16;
+        x = 0 - 1;
+        return x;",
+        65535,
+    )
 }
 
 #[test]
@@ -58,15 +57,15 @@ fn limits_u32() -> DynoResult<()> {
         x = 4294967295 + 1;
         return x;",
         0,
-    )
+    )?;
 
-    //    assert_run(
-    //        r"
-    //        let x: u32;
-    //        x = 0 - 1;
-    //        return x;",
-    //        4294967295,
-    //    )
+    assert_run(
+        r"
+        let x: u32;
+        x = 0 - 1;
+        return x;",
+        4294967295,
+    )
 }
 
 #[test]
@@ -77,13 +76,13 @@ fn limits_u64() -> DynoResult<()> {
         x = 18446744073709551615 + 1;
         return x;",
         0,
-    )
+    )?;
 
-    //    assert_run(
-    //        r"
-    //        let x: u64;
-    //        x = 0 - 1;
-    //        return x;",
-    //        4294967295,
-    //    )
+    assert_run(
+        r"
+        let x: u64;
+        x = 0 - 1;
+        return x;",
+        18446744073709551615,
+    )
 }

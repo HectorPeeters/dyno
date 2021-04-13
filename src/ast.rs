@@ -135,7 +135,16 @@ impl Expression {
         let right_size = right_type.get_bits();
 
         match left_size.cmp(&right_size) {
-            Ordering::Greater => Ok(Expression::Widen(Box::new(right), left_type)),
+            Ordering::Greater => match right {
+                Expression::BinaryOperation(op_type, l, r) => Ok(Expression::BinaryOperation(
+                    op_type,
+                    Box::new(Expression::make_assignment_compatible(left_type, *l)?),
+                    Box::new(Expression::make_assignment_compatible(left_type, *r)?),
+                )),
+                Expression::Literal(_, _) => Ok(Expression::Widen(Box::new(right), left_type)),
+                Expression::Widen(e, _) => Ok(Expression::Widen(e, left_type)),
+                Expression::Identifier(_) => Ok(Expression::Widen(Box::new(right), left_type)),
+            },
             Ordering::Less => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
             Ordering::Equal => Ok(right),
         }
