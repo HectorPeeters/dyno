@@ -1,6 +1,8 @@
 use crate::error::*;
 use crate::lexer::TokenType;
+use crate::scope::Scope;
 use crate::types::{DynoType, DynoValue};
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperationType {
@@ -17,15 +19,21 @@ pub enum BinaryOperationType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AstNode {
-    BinaryOperation(BinaryOperationType, Box<AstNode>, Box<AstNode>),
+pub enum Expression {
+    BinaryOperation(BinaryOperationType, Box<Expression>, Box<Expression>),
     Literal(DynoType, DynoValue),
-    Declaration(Box<AstNode>, DynoType),
-    Assignment(Box<AstNode>, Box<AstNode>),
-    If(Box<AstNode>, Box<AstNode>),
+    Widen(Box<Expression>, DynoType),
     Identifier(String),
-    Return(Box<AstNode>),
-    Block(Vec<AstNode>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Statement {
+    Declaration(String, DynoType),
+    Assignment(String, Expression),
+    If(Expression, Box<Statement>),
+    While(Expression, Box<Statement>),
+    Return(Expression),
+    Block(Vec<Statement>),
 }
 
 impl BinaryOperationType {
@@ -79,14 +87,84 @@ impl BinaryOperationType {
     }
 }
 
-impl AstNode {
-    pub fn get_type(&self) -> DynoResult<DynoType> {
+impl Expression {
+    pub fn make_binop_compatible(
+        op_type: BinaryOperationType,
+        left: Expression,
+        right: Expression,
+        scope: &Scope<DynoType>,
+    ) -> DynoResult<Option<Expression>> {
+        match op_type {
+            BinaryOperationType::Add
+            | BinaryOperationType::Subtract
+            | BinaryOperationType::Multiply
+            | BinaryOperationType::Divide
+            | BinaryOperationType::Equal
+            | BinaryOperationType::NotEqual
+            | BinaryOperationType::LessThan
+            | BinaryOperationType::LessThanEqual
+            | BinaryOperationType::GreaterThan
+            | BinaryOperationType::GreaterThanEqual => {
+                let left_type = left.get_type(scope)?;
+                let right_type = right.get_type(scope)?;
+                let left_size = left_type.get_bits();
+                let right_size = right_type.get_bits();
+
+                Ok(Some(match left_size.cmp(&right_size) {
+                    Ordering::Less => Expression::BinaryOperation(
+                        op_type,
+                        Box::new(Expression::Widen(Box::new(left), right_type)),
+                        Box::new(right),
+                    ),
+                    Ordering::Greater => Expression::BinaryOperation(
+                        op_type,
+                        Box::new(left),
+                        Box::new(Expression::Widen(Box::new(right), left_type)),
+                    ),
+                    Ordering::Equal => {
+                        Expression::BinaryOperation(op_type, Box::new(left), Box::new(right))
+                    }
+                }))
+            }
+        }
+    }
+
+    pub fn make_assignment_compatible(
+        left_type: DynoType,
+        right: Expression,
+        scope: &Scope<DynoType>,
+    ) -> DynoResult<Expression> {
+        let right_type = right.get_type(scope)?;
+        let left_size = left_type.get_bits();
+        let right_size = right_type.get_bits();
+
+        match left_size.cmp(&right_size) {
+            Ordering::Greater => match right {
+                Expression::BinaryOperation(op_type, l, r) => Ok(Expression::BinaryOperation(
+                    op_type,
+                    Box::new(Expression::make_assignment_compatible(
+                        left_type, *l, scope,
+                    )?),
+                    Box::new(Expression::make_assignment_compatible(
+                        left_type, *r, scope,
+                    )?),
+                )),
+                Expression::Literal(_, _) => Ok(Expression::Widen(Box::new(right), left_type)),
+                Expression::Widen(e, _) => Ok(Expression::Widen(e, left_type)),
+                Expression::Identifier(_) => Ok(Expression::Widen(Box::new(right), left_type)),
+            },
+            Ordering::Less => Err(DynoError::IncompatibleTypeError(left_type, right_type)),
+            Ordering::Equal => Ok(right),
+        }
+    }
+
+    pub fn get_type(&self, scope: &Scope<DynoType>) -> DynoResult<DynoType> {
         match self {
-            AstNode::BinaryOperation(op, left, right) => {
+            Expression::BinaryOperation(op, left, right) => {
                 use BinaryOperationType::*;
 
-                let left_type = left.get_type()?;
-                let right_type = right.get_type()?;
+                let left_type = left.get_type(scope)?;
+                let right_type = right.get_type(scope)?;
                 // TODO: this should probably get replaced by something better
                 match op {
                     Equal | NotEqual | LessThan | LessThanEqual | GreaterThan
@@ -98,20 +176,20 @@ impl AstNode {
                         }
                     }
                     _ => {
-                        if left_type.is_int() && right_type.is_int() {
-                            if left_type.get_bits() > right_type.get_bits() {
-                                Ok(left_type)
-                            } else {
-                                Ok(right_type)
-                            }
+                        if left_type.is_int()
+                            && right_type.is_int()
+                            && (left_type.get_bits() == right_type.get_bits())
+                        {
+                            Ok(left_type)
                         } else {
                             Err(DynoError::IncompatibleTypeError(left_type, right_type))
                         }
                     }
                 }
             }
-            AstNode::Literal(value_type, _) => Ok(*value_type),
-            _ => Ok(DynoType::Void()),
+            Expression::Literal(value_type, _) => Ok(*value_type),
+            Expression::Widen(_, value_type) => Ok(*value_type),
+            Expression::Identifier(x) => scope.find(x),
         }
     }
 }
@@ -120,6 +198,7 @@ impl AstNode {
 mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
+    use crate::ast::Expression::{BinaryOperation, Literal};
     use crate::types::{DynoType, DynoValue};
 
     #[test]
@@ -136,16 +215,16 @@ mod tests {
 
     #[test]
     fn test_bin_op_size() {
-        let ast = AstNode::BinaryOperation(
+        let ast = BinaryOperation(
             Add,
-            Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(4))),
-            Box::new(AstNode::BinaryOperation(
+            Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(4))),
+            Box::new(BinaryOperation(
                 Multiply,
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(3))),
-                Box::new(AstNode::Literal(DynoType::UInt8(), DynoValue::UInt(2))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(3))),
+                Box::new(Literal(DynoType::UInt8(), DynoValue::UInt(2))),
             )),
         );
 
-        assert_eq!(ast.get_type(), Ok(DynoType::UInt8()));
+        assert_eq!(ast.get_type(&Scope::default()), Ok(DynoType::UInt8()));
     }
 }

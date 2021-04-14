@@ -1,14 +1,6 @@
 #![allow(dead_code)]
 
-mod ast;
-mod elf;
-mod error;
-mod generator;
-mod jit;
-mod lexer;
-mod parser;
-mod types;
-
+use dyno::*;
 use std::env;
 use std::io::{stdin, stdout, Write};
 
@@ -60,22 +52,14 @@ fn main() {
             println!("{:#?}", ast);
         }
 
-        // Code generation
-
-        let assembly = generator::gen_assembly(ast);
-        if assembly.is_err() {
-            eprintln!("Failed to generate assembly: {}", assembly.err().unwrap());
+        // Jit execution
+        let result = generator::compile_and_run(&ast);
+        if result.is_err() {
+            eprintln!("Failed to compile and run ast: {}", result.err().unwrap());
             continue;
         }
-        let assembly = assembly.unwrap();
+        let result = result.unwrap();
 
-        if args.contains(&"--cg".to_string()) {
-            println!("\nCode gen ({} bytes): ", assembly.len());
-            println!("{:02X?}\n", assembly);
-        }
-
-        let jit = jit::Jit::new(&assembly);
-        let result = jit.run();
         println!("=> {}", result);
     }
 }

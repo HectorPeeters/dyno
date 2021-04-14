@@ -1,565 +1,285 @@
-use crate::ast::{AstNode, BinaryOperationType};
+use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
-use crate::types::DynoValue;
-use std::collections::VecDeque;
-use std::io::BufWriter;
-use std::io::Write;
+use crate::scope::Scope;
+use crate::types::*;
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::execution_engine::{ExecutionEngine, JitFunction};
+use inkwell::module::Module;
+use inkwell::values::{FunctionValue, IntValue, PointerValue};
+use inkwell::IntPredicate;
+use inkwell::OptimizationLevel;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum Reg {
-    Rax = 0,
-    Rcx = 1,
-    Rdx = 2,
-    Rbx = 3,
-    Rsp = 4,
-    Rbp = 5,
-    Rsi = 6,
-    Rdi = 7,
-    R8 = 8,
-    R9 = 9,
-    R10 = 10,
-    R11 = 11,
-    R12 = 12,
-    R13 = 13,
-    R14 = 14,
-    R15 = 15,
+type MainFunc = unsafe extern "C" fn() -> u64;
+
+pub struct CodeGenerator<'a> {
+    context: &'a Context,
+    module: Module<'a>,
+    builder: Builder<'a>,
+    execution_engine: ExecutionEngine<'a>,
+    current_function: Option<FunctionValue<'a>>,
+    variables: Scope<PointerValue<'a>>,
 }
 
-impl Reg {
-    fn is_r(self) -> bool {
-        match self {
-            Reg::R8 | Reg::R9 | Reg::R10 | Reg::R11 | Reg::R12 | Reg::R13 | Reg::R14 | Reg::R15 => {
-                true
+impl CodeGenerator<'_> {
+    fn generate_literal(&self, literal_type: &DynoType, value: &DynoValue) -> DynoResult<IntValue> {
+        match (literal_type, value) {
+            (DynoType::UInt8(), DynoValue::UInt(x)) => {
+                Ok(self.context.i8_type().const_int(*x, false))
             }
-            _ => false,
-        }
-    }
-
-    fn get_r_adapted_value(self) -> u8 {
-        if self.is_r() {
-            self as u8 - 8
-        } else {
-            self as u8
-        }
-    }
-}
-
-impl From<usize> for Reg {
-    fn from(x: usize) -> Reg {
-        use Reg::*;
-
-        match x {
-            0 => Rax,
-            1 => Rcx,
-            2 => Rdx,
-            3 => Rbx,
-            4 => Rsp,
-            5 => Rbp,
-            6 => Rsi,
-            7 => Rdi,
-            8 => R8,
-            9 => R9,
-            10 => R10,
-            11 => R11,
-            12 => R12,
-            13 => R13,
-            14 => R14,
-            15 => R15,
-            _ => unreachable!(),
-        }
-    }
-}
-
-struct X86Generator {
-    writer_stack: VecDeque<BufWriter<Vec<u8>>>,
-    used_regs: Vec<bool>,
-}
-
-const EXPRESSION_REGISTER_OFFSET: usize = 6;
-
-impl X86Generator {
-    fn new() -> Self {
-        let mut deque = VecDeque::with_capacity(1);
-        deque.push_front(BufWriter::new(vec![]));
-        Self {
-            writer_stack: deque,
-            used_regs: vec![false; 3],
-        }
-    }
-
-    fn new_reg(&mut self) -> DynoResult<Reg> {
-        for i in 0..self.used_regs.len() {
-            if !self.used_regs[i] {
-                self.used_regs[i] = true;
-                return Ok(Reg::from(i + EXPRESSION_REGISTER_OFFSET));
+            (DynoType::UInt16(), DynoValue::UInt(x)) => {
+                Ok(self.context.i16_type().const_int(*x, false))
             }
-        }
-        Err(DynoError::GeneratorError(
-            "Failed to allocate new register".to_string(),
-        ))
-    }
-
-    fn free_reg(&mut self, reg: Reg) -> DynoResult<()> {
-        match self.used_regs[reg as usize - EXPRESSION_REGISTER_OFFSET] {
-            true => {
-                self.used_regs[reg as usize - EXPRESSION_REGISTER_OFFSET] = false;
-                Ok(())
+            (DynoType::UInt32(), DynoValue::UInt(x)) => {
+                Ok(self.context.i32_type().const_int(*x, false))
             }
-            false => Err(DynoError::GeneratorError(format!(
-                "Trying to free reg which isn't used: {:?}",
-                reg
-            ))),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn push_buffer(&mut self) {
-        self.writer_stack.push_front(BufWriter::new(vec![]));
-    }
-
-    #[allow(dead_code)]
-    fn pop_buffer(&mut self) -> DynoResult<Vec<u8>> {
-        let writer = self
-            .writer_stack
-            .pop_front()
-            .ok_or(DynoError::NoneError())?;
-
-        Ok(writer.into_inner()?)
-    }
-
-    fn write(&mut self, data: &[u8]) -> DynoResult<()> {
-        let writer = self
-            .writer_stack
-            .front_mut()
-            .ok_or(DynoError::NoneError())?;
-
-        match writer.write(data) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(DynoError::X86WriteError()),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn write_u8(&mut self, data: u8) -> DynoResult<()> {
-        self.write(&[data])
-    }
-
-    #[allow(dead_code)]
-    fn write_u16(&mut self, data: u16) -> DynoResult<()> {
-        self.write(&[(data & 0xFF) as u8, ((data >> 8) & 0xFF) as u8])
-    }
-
-    #[allow(dead_code)]
-    fn write_u32(&mut self, data: u32) -> DynoResult<()> {
-        self.write(&[
-            (data & 0xFF) as u8,
-            ((data >> 8) & 0xFF) as u8,
-            ((data >> 16) & 0xFF) as u8,
-            ((data >> 24) & 0xFF) as u8,
-        ])
-    }
-
-    fn write_u64(&mut self, data: u64) -> DynoResult<()> {
-        self.write(&[
-            (data & 0xFF) as u8,
-            ((data >> 8) & 0xFF) as u8,
-            ((data >> 16) & 0xFF) as u8,
-            ((data >> 24) & 0xFF) as u8,
-            ((data >> 32) & 0xFF) as u8,
-            ((data >> 40) & 0xFF) as u8,
-            ((data >> 48) & 0xFF) as u8,
-            ((data >> 56) & 0xFF) as u8,
-        ])
-    }
-
-    fn write_movq_imm_reg(&mut self, value: u64, dst: Reg) -> DynoResult<()> {
-        if dst.is_r() {
-            self.write(&[0x49, 0xb8 + (dst as u8 - 8)])?;
-        } else {
-            self.write(&[0x48, 0xb8 + dst as u8])?;
-        }
-        self.write_u64(value)
-    }
-
-    fn write_movq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
-            (false, false) => 0x48,
-            (false, true) => 0x49,
-            (true, false) => 0x4c,
-            (true, true) => 0x4d,
-        };
-        self.write(&[
-            instr_byte_1,
-            0x89,
-            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
-        ])
-    }
-
-    fn write_addq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
-            (false, false) => 0x48,
-            (false, true) => 0x49,
-            (true, false) => 0x4c,
-            (true, true) => 0x4d,
-        };
-        self.write(&[
-            instr_byte_1,
-            0x01,
-            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
-        ])
-    }
-
-    fn write_subq_reg_reg(&mut self, src: Reg, dst: Reg) -> DynoResult<()> {
-        let instr_byte_1 = match (src.is_r(), dst.is_r()) {
-            (false, false) => 0x48,
-            (false, true) => 0x49,
-            (true, false) => 0x4c,
-            (true, true) => 0x4d,
-        };
-        self.write(&[
-            instr_byte_1,
-            0x29,
-            0xC0 + (src.get_r_adapted_value() * 8 + dst.get_r_adapted_value()),
-        ])
-    }
-
-    fn write_mulq_reg(&mut self, src: Reg) -> DynoResult<()> {
-        match src.is_r() {
-            false => self.write(&[0x48, 0xF7, 0xE0 + src as u8]),
-            true => self.write(&[0x49, 0xF7, 0xE0 + (src as u8 - 8)]),
-        }
-    }
-
-    fn write_divq_reg(&mut self, src: Reg) -> DynoResult<()> {
-        match src.is_r() {
-            false => self.write(&[0x48, 0xF7, 0xf0 + src as u8]),
-            true => self.write(&[0x49, 0xF7, 0xf0 + (src as u8 - 8)]),
-        }
-    }
-
-    fn write_cmp_reg_reg(&mut self, a: Reg, b: Reg) -> DynoResult<()> {
-        let instr_byte_1 = match (a.is_r(), b.is_r()) {
-            (false, false) => 0x48,
-            (false, true) => 0x49,
-            (true, false) => 0x4c,
-            (true, true) => 0x4d,
-        };
-        self.write(&[
-            instr_byte_1,
-            0x39,
-            0xC0 + (b.get_r_adapted_value() * 8 + a.get_r_adapted_value()),
-        ])
-    }
-
-    fn write_sete_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x94, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_setne_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x95, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_setl_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x9C, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_setle_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x9E, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_setg_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x9F, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_setge_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x41 } else { 0x40 };
-        self.write(&[first_byte, 0x0F, 0x9D, 0xC0 + x.get_r_adapted_value()])
-    }
-
-    fn write_movzx_reg(&mut self, x: Reg) -> DynoResult<()> {
-        let first_byte = if x.is_r() { 0x4D } else { 0x48 };
-        self.write(&[first_byte, 0x0F, 0xB6, 0xC0 + x.get_r_adapted_value() * 9])
-    }
-
-    fn write_prologue(&mut self) -> DynoResult<()> {
-        self.write(&[0x55, 0x48, 0x89, 0xE5])
-    }
-
-    fn write_epilogue(&mut self) -> DynoResult<()> {
-        self.write(&[0x48, 0x89, 0xE5, 0x5D, 0xC3])
-    }
-
-    fn gen_binary_operation(
-        &mut self,
-        op_type: BinaryOperationType,
-        left_reg: Reg,
-        right_reg: Reg,
-    ) -> DynoResult<Reg> {
-        match op_type {
-            BinaryOperationType::Add => self.write_addq_reg_reg(right_reg, left_reg)?,
-            BinaryOperationType::Subtract => self.write_subq_reg_reg(right_reg, left_reg)?,
-            BinaryOperationType::Multiply => {
-                self.write_movq_reg_reg(right_reg, Reg::Rax)?;
-                self.write_mulq_reg(left_reg)?;
-                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
-            }
-            BinaryOperationType::Divide => {
-                self.write_movq_reg_reg(left_reg, Reg::Rax)?;
-                self.write(&[0x99])?;
-                self.write_divq_reg(right_reg)?;
-                self.write_movq_reg_reg(Reg::Rax, left_reg)?;
-            }
-            BinaryOperationType::Equal => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_sete_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-            BinaryOperationType::NotEqual => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_setne_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-            BinaryOperationType::LessThan => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_setl_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-            BinaryOperationType::LessThanEqual => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_setle_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-            BinaryOperationType::GreaterThan => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_setg_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-            BinaryOperationType::GreaterThanEqual => {
-                self.write_cmp_reg_reg(left_reg, right_reg)?;
-                self.write_setge_reg(left_reg)?;
-                self.write_movzx_reg(left_reg)?;
-            }
-        }
-
-        self.free_reg(right_reg)?;
-
-        Ok(left_reg)
-    }
-
-    fn gen_expression(&mut self, ast: &AstNode) -> DynoResult<Reg> {
-        match ast {
-            AstNode::Literal(_, value) => match value {
-                DynoValue::UInt(x) => {
-                    let reg = self.new_reg()?;
-                    self.write_movq_imm_reg(*x as u64, reg)?;
-                    Ok(reg)
-                }
-                _ => Err(DynoError::GeneratorError(format!(
-                    "Cannot gen expression for {:?}",
-                    value
-                ))),
-            },
-            AstNode::BinaryOperation(op_type, left, right) => {
-                let left_reg = self.gen_expression(left)?;
-                let right_reg = self.gen_expression(right)?;
-
-                self.gen_binary_operation(*op_type, left_reg, right_reg)
+            (DynoType::UInt64(), DynoValue::UInt(x)) => {
+                Ok(self.context.i64_type().const_int(*x, false))
             }
             _ => Err(DynoError::GeneratorError(format!(
-                "Cannot gen expression for {:?}",
-                ast
+                "Invalid type-value pair: {:?} {:?}",
+                literal_type, value
             ))),
         }
     }
 
-    fn gen_single_node(&mut self, node: &AstNode) -> DynoResult<()> {
-        match node {
-            AstNode::Return(expression) => {
-                let reg = self.gen_expression(expression)?;
-                self.write_movq_reg_reg(reg, Reg::Rax)?;
-                self.write_epilogue()?;
+    fn generate_binary_operation(
+        &self,
+        op_type: &BinaryOperationType,
+        left: &Expression,
+        right: &Expression,
+    ) -> DynoResult<IntValue> {
+        let left_value = self.generate_expression(left)?;
+        let right_value = self.generate_expression(right)?;
+
+        match op_type {
+            BinaryOperationType::Add => Ok(self.builder.build_int_add(left_value, right_value, "")),
+            BinaryOperationType::Subtract => {
+                Ok(self.builder.build_int_sub(left_value, right_value, ""))
             }
-            AstNode::Block(nodes) => {
-                for node in nodes {
-                    self.gen_single_node(node)?;
+            BinaryOperationType::Multiply => {
+                Ok(self.builder.build_int_mul(left_value, right_value, ""))
+            }
+            BinaryOperationType::Divide => {
+                Ok(self
+                    .builder
+                    .build_int_unsigned_div(left_value, right_value, ""))
+            }
+            BinaryOperationType::Equal => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::EQ, left_value, right_value, ""))
+            }
+            BinaryOperationType::NotEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::NE, left_value, right_value, ""))
+            }
+            BinaryOperationType::LessThan => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::ULT, left_value, right_value, ""))
+            }
+            BinaryOperationType::LessThanEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::ULE, left_value, right_value, ""))
+            }
+            BinaryOperationType::GreaterThan => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::UGT, left_value, right_value, ""))
+            }
+            BinaryOperationType::GreaterThanEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::UGE, left_value, right_value, ""))
+            }
+        }
+    }
+
+    fn generate_widen(
+        &self,
+        expression: &Expression,
+        widen_type: &DynoType,
+    ) -> DynoResult<IntValue> {
+        let value = self.generate_expression(expression)?;
+
+        let llvm_type = match widen_type {
+            DynoType::UInt8() => Ok(self.context.i8_type()),
+            DynoType::UInt16() => Ok(self.context.i16_type()),
+            DynoType::UInt32() => Ok(self.context.i32_type()),
+            DynoType::UInt64() => Ok(self.context.i64_type()),
+            _ => Err(DynoError::GeneratorError(format!(
+                "Cannot widen: {:?}",
+                expression
+            ))),
+        }?;
+
+        Ok(self.builder.build_int_z_extend(value, llvm_type, ""))
+    }
+
+    fn generate_identifier_expression(&self, name: &str) -> DynoResult<IntValue> {
+        let variable = self.variables.find(name)?;
+
+        Ok(self.builder.build_load(variable, name).into_int_value())
+    }
+
+    fn generate_expression(&self, expression: &Expression) -> DynoResult<IntValue> {
+        match expression {
+            Expression::Literal(literal_type, value) => {
+                self.generate_literal(&literal_type, &value)
+            }
+            Expression::BinaryOperation(op, left, right) => {
+                self.generate_binary_operation(&op, &left, &right)
+            }
+            Expression::Widen(value, widen_type) => self.generate_widen(&value, &widen_type),
+            Expression::Identifier(name) => self.generate_identifier_expression(name),
+        }
+    }
+
+    fn generate_return(&self, expression: &Expression) -> DynoResult<()> {
+        let expression_value = self.generate_expression(expression)?;
+
+        let i64_type = self.context.i64_type();
+        let return_value = self
+            .builder
+            .build_int_z_extend(expression_value, i64_type, "");
+
+        self.builder.build_return(Some(&return_value));
+        Ok(())
+    }
+
+    fn generate_if(
+        &mut self,
+        condition: &Expression,
+        true_statement: &Statement,
+    ) -> DynoResult<()> {
+        let condition_value = self.generate_expression(condition)?;
+
+        let parent = self.current_function.unwrap();
+
+        let true_block = self.context.append_basic_block(parent, "true");
+        let continue_block = self.context.append_basic_block(parent, "continue");
+
+        self.builder
+            .build_conditional_branch(condition_value, true_block, continue_block);
+
+        self.builder.position_at_end(true_block);
+        self.generate_statement(true_statement)?;
+        self.builder.build_unconditional_branch(continue_block);
+
+        self.builder.position_at_end(continue_block);
+
+        Ok(())
+    }
+
+    fn generate_declaration(&mut self, variable: &str, value_type: &DynoType) -> DynoResult<()> {
+        let llvm_type = match value_type {
+            DynoType::UInt8() => Ok(self.context.i8_type()),
+            DynoType::UInt16() => Ok(self.context.i16_type()),
+            DynoType::UInt32() => Ok(self.context.i32_type()),
+            DynoType::UInt64() => Ok(self.context.i64_type()),
+            _ => Err(DynoError::GeneratorError(format!(
+                "Invalid dyno type for llvm declaration: {:?}",
+                value_type
+            ))),
+        }?;
+
+        let alloca = self.builder.build_alloca(llvm_type, variable);
+
+        self.builder
+            .build_store(alloca, llvm_type.const_int(0, false));
+
+        self.variables.insert(variable, alloca)?;
+
+        Ok(())
+    }
+
+    fn generate_assignment(&self, variable_name: &str, expression: &Expression) -> DynoResult<()> {
+        let variable = self.variables.find(variable_name)?;
+
+        let value = self.generate_expression(expression)?;
+
+        self.builder.build_store(variable, value);
+
+        Ok(())
+    }
+
+    fn generate_while(&mut self, condition: &Expression, body: &Statement) -> DynoResult<()> {
+        let parent = self.current_function.unwrap();
+
+        let condition_block = self.context.append_basic_block(parent, "condition");
+        let true_block = self.context.append_basic_block(parent, "true");
+        //        let false_block = self.context.append_basic_block(parent, "false");
+        let continue_block = self.context.append_basic_block(parent, "continue");
+
+        self.builder.build_unconditional_branch(condition_block);
+
+        self.builder.position_at_end(condition_block);
+        let condition_value = self.generate_expression(condition)?;
+        self.builder
+            .build_conditional_branch(condition_value, true_block, continue_block);
+
+        self.builder.position_at_end(true_block);
+        self.generate_statement(body)?;
+        self.builder.build_unconditional_branch(condition_block);
+
+        self.builder.position_at_end(continue_block);
+
+        Ok(())
+    }
+
+    fn generate_statement(&mut self, statement: &Statement) -> DynoResult<()> {
+        match statement {
+            Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
+            Statement::While(condition, body) => self.generate_while(condition, body),
+            Statement::Return(x) => self.generate_return(x),
+            Statement::Block(children) => {
+                self.variables.push();
+                for child in children {
+                    self.generate_statement(&child)?;
                 }
+                self.variables.pop()?;
+                Ok(())
             }
-            AstNode::Declaration(_, _) => {}
-            AstNode::Assignment(_name, expression) => {
-                let _reg = self.gen_expression(expression)?;
-                //TODO: write value to variable "name"
-            }
-            _ => {
-                return Err(DynoError::GeneratorError(format!(
-                    "Cannot generate code for {:?}",
-                    node,
-                )))
-            }
+            Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
+            Statement::Assignment(name, expression) => self.generate_assignment(name, expression),
         }
-
-        Ok(())
     }
 
-    fn gen(&mut self, ast: &AstNode) -> DynoResult<Vec<u8>> {
-        // Make sure there are no buffers left on the stack except the main one
-        assert_eq!(self.writer_stack.len(), 1);
+    pub fn jit_execute(&mut self, ast: &Statement) -> DynoResult<u64> {
+        let i64_type = self.context.i64_type();
+        let fn_type = i64_type.fn_type(&[], false);
+        let function = self.module.add_function("main", fn_type, None);
+        let basic_block = self.context.append_basic_block(function, "entry");
 
-        self.write_prologue()?;
+        self.builder.position_at_end(basic_block);
 
-        self.gen_single_node(ast)?;
+        self.current_function = Some(function);
+        self.generate_statement(ast)?;
 
-        Ok(self
-            .writer_stack
-            .front()
-            .ok_or(DynoError::NoneError())?
-            .buffer()
-            .to_vec())
+        unsafe {
+            let function: JitFunction<MainFunc> =
+                self.execution_engine.get_function("main").unwrap();
+
+            Ok(function.call())
+        }
     }
 }
 
-pub fn gen_assembly(ast: AstNode) -> DynoResult<Vec<u8>> {
-    let mut generator = X86Generator::new();
-    generator.gen(&ast)
-}
+pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
+    let context = Context::create();
+    let module = context.create_module("jit");
+    let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
+    let mut code_generator = CodeGenerator {
+        context: &context,
+        module,
+        builder: context.create_builder(),
+        execution_engine,
+        current_function: None,
+        variables: Scope::new(),
+    };
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::DynoType;
-
-    fn assert_buffer(gen: &X86Generator, buff: &[u8]) -> DynoResult<()> {
-        assert_eq!(
-            gen.writer_stack
-                .front()
-                .ok_or(DynoError::NoneError())?
-                .buffer(),
-            buff
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn generator_new() {
-        let _ = X86Generator::new();
-    }
-
-    #[test]
-    fn generator_write_stack() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-        generator.write_u8(1)?;
-        generator.push_buffer();
-        generator.write_u8(2)?;
-        generator.write_u8(3)?;
-        generator.write_u8(4)?;
-        let buffer = generator.pop_buffer()?;
-        generator.write_u8(5)?;
-        generator.write(&buffer)?;
-        assert_buffer(&generator, &[1, 5, 2, 3, 4])
-    }
-
-    #[test]
-    fn generator_write_u8() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        generator.write_u8(12).unwrap();
-        assert_buffer(&generator, &[12])
-    }
-
-    #[test]
-    fn generator_write_u16() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        generator.write_u16(0x1234).unwrap();
-        assert_buffer(&generator, &[0x34, 0x12])
-    }
-
-    #[test]
-    fn generator_write_u32() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        generator.write_u32(0x12345678).unwrap();
-        assert_buffer(&generator, &[0x78, 0x56, 0x34, 0x12])
-    }
-
-    #[test]
-    fn generator_write_u64() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        generator.write_u64(0x1234567812345678).unwrap();
-        assert_buffer(
-            &generator,
-            &[0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12],
-        )
-    }
-
-    #[test]
-    fn generator_write_movq_reg_reg() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        generator.write_movq_reg_reg(Reg::R15, Reg::R12).unwrap();
-        generator.write_movq_reg_reg(Reg::Rbx, Reg::R12).unwrap();
-        generator.write_movq_reg_reg(Reg::R13, Reg::Rsi).unwrap();
-        generator.write_movq_reg_reg(Reg::Rcx, Reg::Rdx).unwrap();
-
-        assert_buffer(
-            &generator,
-            &[
-                0x4D, 0x89, 0xFC, 0x49, 0x89, 0xDC, 0x4C, 0x89, 0xEE, 0x48, 0x89, 0xCA,
-            ],
-        )
-    }
-
-    #[test]
-    fn generate_sete() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        for i in 0..16 {
-            generator.write_sete_reg(Reg::from(i))?;
-        }
-
-        assert_buffer(
-            &generator,
-            &[
-                0x40, 0x0F, 0x94, 0xC0, 0x40, 0x0F, 0x94, 0xC1, 0x40, 0x0F, 0x94, 0xC2, 0x40, 0x0F,
-                0x94, 0xC3, 0x40, 0x0F, 0x94, 0xC4, 0x40, 0x0F, 0x94, 0xC5, 0x40, 0x0F, 0x94, 0xC6,
-                0x40, 0x0F, 0x94, 0xC7, 0x41, 0x0F, 0x94, 0xC0, 0x41, 0x0F, 0x94, 0xC1, 0x41, 0x0F,
-                0x94, 0xC2, 0x41, 0x0F, 0x94, 0xC3, 0x41, 0x0F, 0x94, 0xC4, 0x41, 0x0F, 0x94, 0xC5,
-                0x41, 0x0F, 0x94, 0xC6, 0x41, 0x0F, 0x94, 0xC7,
-            ],
-        )
-    }
-
-    #[test]
-    fn generate_movzx() -> DynoResult<()> {
-        let mut generator = X86Generator::new();
-
-        for i in 0..16 {
-            generator.write_movzx_reg(Reg::from(i))?;
-        }
-
-        assert_buffer(
-            &generator,
-            &[
-                0x48, 0x0F, 0xB6, 0xC0, 0x48, 0x0F, 0xB6, 0xC9, 0x48, 0x0F, 0xB6, 0xD2, 0x48, 0x0F,
-                0xB6, 0xDB, 0x48, 0x0F, 0xB6, 0xE4, 0x48, 0x0F, 0xB6, 0xED, 0x48, 0x0F, 0xB6, 0xF6,
-                0x48, 0x0F, 0xB6, 0xFF, 0x4D, 0x0F, 0xB6, 0xC0, 0x4D, 0x0F, 0xB6, 0xC9, 0x4D, 0x0F,
-                0xB6, 0xD2, 0x4D, 0x0F, 0xB6, 0xDB, 0x4D, 0x0F, 0xB6, 0xE4, 0x4D, 0x0F, 0xB6, 0xED,
-                0x4D, 0x0F, 0xB6, 0xF6, 0x4D, 0x0F, 0xB6, 0xFF,
-            ],
-        )
-    }
-
-    #[test]
-    fn generator_write_single_int_literal() {
-        gen_assembly(AstNode::Return(Box::new(AstNode::Literal(
-            DynoType::UInt16(),
-            DynoValue::UInt(1234),
-        ))))
-        .unwrap();
-    }
+    code_generator.jit_execute(statement)
 }

@@ -10,17 +10,25 @@ pub enum DynoError {
     IntegerParseError(String),
     UnexpectedTokenError(TokenType, Vec<TokenType>),
     IncompatibleTypeError(DynoType, DynoType),
+    IdentifierError(String),
     ElfWriteError(),
     X86WriteError(),
     GeneratorError(String),
     VisitError(String),
     NoneError(),
     IntoInnerError(),
+    LlvmError(String),
 }
 
 impl<T> From<std::io::IntoInnerError<T>> for DynoError {
     fn from(_error: std::io::IntoInnerError<T>) -> Self {
         DynoError::IntoInnerError()
+    }
+}
+
+impl From<inkwell::support::LLVMString> for DynoError {
+    fn from(error: inkwell::support::LLVMString) -> Self {
+        DynoError::LlvmError(error.to_string())
     }
 }
 
@@ -48,12 +56,14 @@ impl fmt::Display for DynoError {
             IncompatibleTypeError(left, right) => {
                 write!(f, "Incompatible types {:?} and {:?}", left, right)
             }
+            IdentifierError(message) => write!(f, "Identifier error: {}", message),
             ElfWriteError() => write!(f, "Error while writing ELF file"),
             X86WriteError() => write!(f, "Error while writing x86 assembly"),
             GeneratorError(message) => write!(f, "Code generator error: {}", message),
             VisitError(message) => write!(f, "Visit error: {}", message),
             NoneError() => write!(f, "None error"),
-            IntoInnerError() => write!(f, "Into inner error"), 
+            IntoInnerError() => write!(f, "Into inner error"),
+            LlvmError(message) => write!(f, "LLVM error: {}", message),
         }
     }
 }
