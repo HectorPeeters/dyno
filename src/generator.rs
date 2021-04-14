@@ -75,10 +75,26 @@ impl CodeGenerator<'_> {
                     .builder
                     .build_int_compare(IntPredicate::NE, left_value, right_value, ""))
             }
-            _ => Err(DynoError::GeneratorError(format!(
-                "Invalid binary operation: {:?}",
-                op_type
-            ))),
+            BinaryOperationType::LessThan => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::ULT, left_value, right_value, ""))
+            }
+            BinaryOperationType::LessThanEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::ULE, left_value, right_value, ""))
+            }
+            BinaryOperationType::GreaterThan => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::UGT, left_value, right_value, ""))
+            }
+            BinaryOperationType::GreaterThanEqual => {
+                Ok(self
+                    .builder
+                    .build_int_compare(IntPredicate::UGE, left_value, right_value, ""))
+            }
         }
     }
 
@@ -144,18 +160,13 @@ impl CodeGenerator<'_> {
         let parent = self.current_function.unwrap();
 
         let true_block = self.context.append_basic_block(parent, "true");
-        let false_block = self.context.append_basic_block(parent, "false");
         let continue_block = self.context.append_basic_block(parent, "continue");
 
         self.builder
-            .build_conditional_branch(condition_value, true_block, false_block);
+            .build_conditional_branch(condition_value, true_block, continue_block);
 
         self.builder.position_at_end(true_block);
         self.generate_statement(true_statement)?;
-        self.builder.build_unconditional_branch(continue_block);
-
-        self.builder.position_at_end(false_block);
-        //TODO: add else here
         self.builder.build_unconditional_branch(continue_block);
 
         self.builder.position_at_end(continue_block);
@@ -195,9 +206,34 @@ impl CodeGenerator<'_> {
         Ok(())
     }
 
+    fn generate_while(&mut self, condition: &Expression, body: &Statement) -> DynoResult<()> {
+        let parent = self.current_function.unwrap();
+
+        let condition_block = self.context.append_basic_block(parent, "condition");
+        let true_block = self.context.append_basic_block(parent, "true");
+        //        let false_block = self.context.append_basic_block(parent, "false");
+        let continue_block = self.context.append_basic_block(parent, "continue");
+
+        self.builder.build_unconditional_branch(condition_block);
+
+        self.builder.position_at_end(condition_block);
+        let condition_value = self.generate_expression(condition)?;
+        self.builder
+            .build_conditional_branch(condition_value, true_block, continue_block);
+
+        self.builder.position_at_end(true_block);
+        self.generate_statement(body)?;
+        self.builder.build_unconditional_branch(condition_block);
+
+        self.builder.position_at_end(continue_block);
+
+        Ok(())
+    }
+
     fn generate_statement(&mut self, statement: &Statement) -> DynoResult<()> {
         match statement {
             Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
+            Statement::While(condition, body) => self.generate_while(condition, body),
             Statement::Return(x) => self.generate_return(x),
             Statement::Block(children) => {
                 self.variables.push();

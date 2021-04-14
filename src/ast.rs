@@ -31,6 +31,7 @@ pub enum Statement {
     Declaration(String, DynoType),
     Assignment(String, Expression),
     If(Expression, Box<Statement>),
+    While(Expression, Box<Statement>),
     Return(Expression),
     Block(Vec<Statement>),
 }

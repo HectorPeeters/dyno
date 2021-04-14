@@ -9,6 +9,8 @@ pub enum TokenType {
 
     #[regex(r"let")]
     Let,
+    #[regex(r"while")]
+    While,
     #[regex(r"return")]
     Return,
     #[regex(r"if")]

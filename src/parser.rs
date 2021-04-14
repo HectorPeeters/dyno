@@ -248,9 +248,17 @@ impl Parser {
         Ok(Statement::If(condition, Box::new(true_node)))
     }
 
+    fn parse_while_statement(&mut self) -> DynoResult<Statement> {
+        self.consume_expect(TokenType::While)?;
+        let condition = self.parse_expression(0)?;
+        let body = self.parse_block()?;
+        Ok(Statement::While(condition, Box::new(body)))
+    }
+
     fn parse_statement(&mut self) -> DynoResult<Statement> {
         match self.peek()?.token_type {
             TokenType::Let => self.parse_declaration(),
+            TokenType::While => self.parse_while_statement(),
             TokenType::Return => self.parse_return_statement(),
             TokenType::If => self.parse_if_statement(),
             TokenType::Identifier => self.parse_assignment(),
@@ -259,6 +267,7 @@ impl Parser {
                 self.peek()?.token_type,
                 vec![
                     TokenType::Let,
+                    TokenType::While,
                     TokenType::Return,
                     TokenType::If,
                     TokenType::Identifier,
