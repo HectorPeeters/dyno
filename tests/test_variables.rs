@@ -26,3 +26,18 @@ fn execute_arithmetic_with_variables() -> DynoResult<()> {
         156,
     )
 }
+
+#[test]
+fn execute_same_variable_different_scope() -> DynoResult<()> {
+    assert_run(
+        r"
+        let x: u32;
+        x = 13;
+        {
+            let x: u16;
+            x = 12;
+        }
+        return x;",
+        13,
+    )
+}

@@ -1,5 +1,6 @@
 use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
+use crate::scope::Scope;
 use crate::types::*;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
@@ -8,7 +9,6 @@ use inkwell::module::Module;
 use inkwell::values::{FunctionValue, IntValue, PointerValue};
 use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
-use std::collections::HashMap;
 
 type MainFunc = unsafe extern "C" fn() -> u64;
 
@@ -18,7 +18,7 @@ pub struct CodeGenerator<'a> {
     builder: Builder<'a>,
     execution_engine: ExecutionEngine<'a>,
     current_function: Option<FunctionValue<'a>>,
-    variables: HashMap<String, PointerValue<'a>>,
+    variables: Scope<PointerValue<'a>>,
 }
 
 impl CodeGenerator<'_> {
@@ -104,12 +104,9 @@ impl CodeGenerator<'_> {
     }
 
     fn generate_identifier_expression(&self, name: &str) -> DynoResult<IntValue> {
-        let variable = self
-            .variables
-            .get(name)
-            .ok_or_else(|| DynoError::GeneratorError(format!("Unknown variable: {}", name)))?;
+        let variable = self.variables.find(name)?;
 
-        Ok(self.builder.build_load(*variable, name).into_int_value())
+        Ok(self.builder.build_load(variable, name).into_int_value())
     }
 
     fn generate_expression(&self, expression: &Expression) -> DynoResult<IntValue> {
@@ -183,19 +180,17 @@ impl CodeGenerator<'_> {
         self.builder
             .build_store(alloca, llvm_type.const_int(0, false));
 
-        self.variables.insert(variable.to_string(), alloca);
+        self.variables.insert(variable, alloca)?;
 
         Ok(())
     }
 
     fn generate_assignment(&self, variable_name: &str, expression: &Expression) -> DynoResult<()> {
-        let variable = self.variables.get(variable_name).ok_or_else(|| {
-            DynoError::GeneratorError(format!("Unknown variable: {}", variable_name))
-        })?;
+        let variable = self.variables.find(variable_name)?;
 
         let value = self.generate_expression(expression)?;
 
-        self.builder.build_store(*variable, value);
+        self.builder.build_store(variable, value);
 
         Ok(())
     }
@@ -205,9 +200,11 @@ impl CodeGenerator<'_> {
             Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
             Statement::Return(x) => self.generate_return(x),
             Statement::Block(children) => {
+                self.variables.push();
                 for child in children {
                     self.generate_statement(&child)?;
                 }
+                self.variables.pop()?;
                 Ok(())
             }
             Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
@@ -245,7 +242,7 @@ pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
         builder: context.create_builder(),
         execution_engine,
         current_function: None,
-        variables: HashMap::new(),
+        variables: Scope::new(),
     };
 
     code_generator.jit_execute(statement)
