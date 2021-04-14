@@ -189,13 +189,9 @@ impl CodeGenerator<'_> {
     }
 
     fn generate_assignment(&self, variable_name: &str, expression: &Expression) -> DynoResult<()> {
-        let variable = self
-            .variables
-            .get(variable_name)
-            .ok_or_else(||DynoError::GeneratorError(format!(
-                "Unknown variable: {}",
-                variable_name
-            )))?;
+        let variable = self.variables.get(variable_name).ok_or_else(|| {
+            DynoError::GeneratorError(format!("Unknown variable: {}", variable_name))
+        })?;
 
         let value = self.generate_expression(expression)?;
 

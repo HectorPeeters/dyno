@@ -137,11 +137,16 @@ impl Parser {
             self.consume_expect(token_type)?;
 
             let right = self.parse_expression(current_precendence)?;
-            let left_type = left.get_type()?;
-            let right_type = right.get_type()?;
+            let left_type = left.get_type(&self.variable_scope)?;
+            let right_type = right.get_type(&self.variable_scope)?;
 
-            left = Expression::make_binop_compatible(operator_type, left, right)?
-                .ok_or(DynoError::IncompatibleTypeError(left_type, right_type))?;
+            left = Expression::make_binop_compatible(
+                operator_type,
+                left,
+                right,
+                &self.variable_scope,
+            )?
+            .ok_or(DynoError::IncompatibleTypeError(left_type, right_type))?;
 
             operator = self.peek()?;
 
@@ -199,7 +204,11 @@ impl Parser {
 
         Ok(Statement::Assignment(
             identifier,
-            Expression::make_assignment_compatible(variable_type, expression)?,
+            Expression::make_assignment_compatible(
+                variable_type,
+                expression,
+                &self.variable_scope,
+            )?,
         ))
     }
 

@@ -5,7 +5,10 @@ pub struct Scope<T> {
     items: Vec<HashMap<String, T>>,
 }
 
-impl<T> Scope<T> where T: Copy{
+impl<T> Scope<T>
+where
+    T: Copy,
+{
     pub fn new() -> Self {
         Self {
             items: vec![HashMap::new()],
@@ -41,7 +44,7 @@ impl<T> Scope<T> where T: Copy{
         }
     }
 
-    pub fn find(&mut self, name: &str) -> DynoResult<T> {
+    pub fn find(&self, name: &str) -> DynoResult<T> {
         for scope in self.items.iter().rev() {
             match scope.get(name) {
                 Some(x) => return Ok(*x),
@@ -56,10 +59,13 @@ impl<T> Scope<T> where T: Copy{
     }
 }
 
-impl<T> Default for Scope<T> where T: Copy {
+impl<T> Default for Scope<T>
+where
+    T: Copy,
+{
     fn default() -> Self {
         Self {
             items: vec![HashMap::new()],
         }
-    } 
+    }
 }

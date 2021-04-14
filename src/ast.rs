@@ -1,5 +1,6 @@
 use crate::error::*;
 use crate::lexer::TokenType;
+use crate::scope::Scope;
 use crate::types::{DynoType, DynoValue};
 use std::cmp::Ordering;
 
@@ -90,6 +91,7 @@ impl Expression {
         op_type: BinaryOperationType,
         left: Expression,
         right: Expression,
+        scope: &Scope<DynoType>,
     ) -> DynoResult<Option<Expression>> {
         match op_type {
             BinaryOperationType::Add
@@ -102,8 +104,8 @@ impl Expression {
             | BinaryOperationType::LessThanEqual
             | BinaryOperationType::GreaterThan
             | BinaryOperationType::GreaterThanEqual => {
-                let left_type = left.get_type()?;
-                let right_type = right.get_type()?;
+                let left_type = left.get_type(scope)?;
+                let right_type = right.get_type(scope)?;
                 let left_size = left_type.get_bits();
                 let right_size = right_type.get_bits();
 
@@ -129,8 +131,9 @@ impl Expression {
     pub fn make_assignment_compatible(
         left_type: DynoType,
         right: Expression,
+        scope: &Scope<DynoType>,
     ) -> DynoResult<Expression> {
-        let right_type = right.get_type()?;
+        let right_type = right.get_type(scope)?;
         let left_size = left_type.get_bits();
         let right_size = right_type.get_bits();
 
@@ -138,8 +141,12 @@ impl Expression {
             Ordering::Greater => match right {
                 Expression::BinaryOperation(op_type, l, r) => Ok(Expression::BinaryOperation(
                     op_type,
-                    Box::new(Expression::make_assignment_compatible(left_type, *l)?),
-                    Box::new(Expression::make_assignment_compatible(left_type, *r)?),
+                    Box::new(Expression::make_assignment_compatible(
+                        left_type, *l, scope,
+                    )?),
+                    Box::new(Expression::make_assignment_compatible(
+                        left_type, *r, scope,
+                    )?),
                 )),
                 Expression::Literal(_, _) => Ok(Expression::Widen(Box::new(right), left_type)),
                 Expression::Widen(e, _) => Ok(Expression::Widen(e, left_type)),
@@ -150,13 +157,13 @@ impl Expression {
         }
     }
 
-    pub fn get_type(&self) -> DynoResult<DynoType> {
+    pub fn get_type(&self, scope: &Scope<DynoType>) -> DynoResult<DynoType> {
         match self {
             Expression::BinaryOperation(op, left, right) => {
                 use BinaryOperationType::*;
 
-                let left_type = left.get_type()?;
-                let right_type = right.get_type()?;
+                let left_type = left.get_type(scope)?;
+                let right_type = right.get_type(scope)?;
                 // TODO: this should probably get replaced by something better
                 match op {
                     Equal | NotEqual | LessThan | LessThanEqual | GreaterThan
@@ -181,7 +188,7 @@ impl Expression {
             }
             Expression::Literal(value_type, _) => Ok(*value_type),
             Expression::Widen(_, value_type) => Ok(*value_type),
-            _ => unreachable!(),
+            Expression::Identifier(x) => scope.find(x),
         }
     }
 }
@@ -217,6 +224,6 @@ mod tests {
             )),
         );
 
-        assert_eq!(ast.get_type(), Ok(DynoType::UInt8()));
+        assert_eq!(ast.get_type(&Scope::default()), Ok(DynoType::UInt8()));
     }
 }
