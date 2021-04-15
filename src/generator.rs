@@ -245,6 +245,7 @@ impl CodeGenerator<'_> {
             }
             Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
             Statement::Assignment(name, expression) => self.generate_assignment(name, expression),
+            _ => unreachable!()
         }
     }
 

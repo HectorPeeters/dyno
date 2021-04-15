@@ -255,10 +255,53 @@ impl Parser {
         Ok(Statement::While(condition, Box::new(body)))
     }
 
+    fn parse_parameter_list(&mut self) -> DynoResult<Vec<(String, DynoType)>> {
+        self.consume_expect(TokenType::LeftParen)?;
+
+        let mut result: Vec<(String, DynoType)> = vec![];
+
+        while self.peek()?.token_type != TokenType::RightParen {
+            let name = self.parse_identifier()?;
+            self.consume_expect(TokenType::Colon)?;
+            let parameter_type = self.parse_type()?;
+            result.push((name, parameter_type));
+            if self.peek()?.token_type == TokenType::Comma {
+                self.consume_expect(TokenType::Comma)?;
+            } else {
+                break;
+            }
+        }
+
+        self.consume_expect(TokenType::RightParen)?;
+
+        Ok(result)
+    }
+
+    fn parse_function_statement(&mut self) -> DynoResult<Statement> {
+        self.consume_expect(TokenType::Function)?;
+        let name = self.parse_identifier()?;
+        let params = self.parse_parameter_list()?;
+
+        let return_type = if self.peek()?.token_type == TokenType::Colon {
+            self.consume_expect(TokenType::Colon)?;
+            self.parse_type()?
+        } else {
+            DynoType::Void()
+        };
+
+        if self.peek()?.token_type == TokenType::SemiColon {
+            self.consume_expect(TokenType::SemiColon)?;
+            Ok(Statement::FunctionDefinition(name, params, return_type))
+        } else {
+            unimplemented!();
+        }
+    }
+
     fn parse_statement(&mut self) -> DynoResult<Statement> {
         match self.peek()?.token_type {
             TokenType::Let => self.parse_declaration(),
             TokenType::While => self.parse_while_statement(),
+            TokenType::Function => self.parse_function_statement(),
             TokenType::Return => self.parse_return_statement(),
             TokenType::If => self.parse_if_statement(),
             TokenType::Identifier => self.parse_assignment(),
@@ -299,7 +342,7 @@ mod tests {
     use super::*;
     use crate::ast::BinaryOperationType::*;
     use crate::ast::Expression::{BinaryOperation, Literal, Widen};
-    use crate::ast::Statement::{Assignment, Block, Declaration, If, Return};
+    use crate::ast::Statement::{Assignment, Block, Declaration, FunctionDefinition, If, Return};
     use crate::lexer::lex;
     use crate::lexer::TokenType::*;
 
@@ -527,6 +570,60 @@ mod tests {
             ])
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn parser_function_definition() -> DynoResult<()> {
+        let result = parse(lex("fn test(x: u32, y: bool): u8;")?)?;
+        assert_eq!(
+            result,
+            FunctionDefinition(
+                "test".to_owned(),
+                vec![
+                    ("x".to_owned(), DynoType::UInt32()),
+                    ("y".to_owned(), DynoType::Bool())
+                ],
+                DynoType::UInt8()
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parser_function_definition_no_return_type() -> DynoResult<()> {
+        let result = parse(lex("fn test(x: u32, y: bool);")?)?;
+        assert_eq!(
+            result,
+            FunctionDefinition(
+                "test".to_owned(),
+                vec![
+                    ("x".to_owned(), DynoType::UInt32()),
+                    ("y".to_owned(), DynoType::Bool())
+                ],
+                DynoType::Void()
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parser_function_definition_no_parameters() -> DynoResult<()> {
+        let result = parse(lex("fn test(): u32;")?)?;
+        assert_eq!(
+            result,
+            FunctionDefinition("test".to_owned(), vec![], DynoType::UInt32())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parser_function_definition_no_parameters_no_return_type() -> DynoResult<()> {
+        let result = parse(lex("fn test();")?)?;
+        assert_eq!(
+            result,
+            FunctionDefinition("test".to_owned(), vec![], DynoType::Void())
+        );
         Ok(())
     }
 

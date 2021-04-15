@@ -11,6 +11,8 @@ pub enum TokenType {
     Let,
     #[regex(r"while")]
     While,
+    #[regex(r"fn")]
+    Function,
     #[regex(r"return")]
     Return,
     #[regex(r"if")]
@@ -62,6 +64,8 @@ pub enum TokenType {
     Colon,
     #[regex(r";")]
     SemiColon,
+    #[regex(r",")]
+    Comma,
 
     #[regex(r"\(")]
     LeftParen,
