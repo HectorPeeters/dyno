@@ -1,4 +1,5 @@
 use crate::ast::{BinaryOperationType, Expression, Statement};
+use crate::backend::Backend;
 use crate::error::*;
 use crate::scope::Scope;
 use crate::types::*;
@@ -12,7 +13,7 @@ use inkwell::OptimizationLevel;
 
 type MainFunc = unsafe extern "C" fn() -> u64;
 
-pub struct CodeGenerator<'a> {
+pub struct LlvmBackend<'a> {
     context: &'a Context,
     module: Module<'a>,
     builder: Builder<'a>,
@@ -21,7 +22,27 @@ pub struct CodeGenerator<'a> {
     variables: Scope<PointerValue<'a>>,
 }
 
-impl CodeGenerator<'_> {
+impl Backend for LlvmBackend<'_> {
+    fn generate_statement(&mut self, statement: &Statement) -> DynoResult<()> {
+        match statement {
+            Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
+            Statement::While(condition, body) => self.generate_while(condition, body),
+            Statement::Return(x) => self.generate_return(x),
+            Statement::Block(children) => {
+                self.variables.push();
+                for child in children {
+                    self.generate_statement(&child)?;
+                }
+                self.variables.pop()?;
+                Ok(())
+            }
+            Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
+            Statement::Assignment(name, expression) => self.generate_assignment(name, expression),
+        }
+    }
+}
+
+impl LlvmBackend<'_> {
     fn generate_literal(&self, literal_type: &DynoType, value: &DynoValue) -> DynoResult<IntValue> {
         match (literal_type, value) {
             (DynoType::UInt8(), DynoValue::UInt(x)) => {
@@ -230,24 +251,6 @@ impl CodeGenerator<'_> {
         Ok(())
     }
 
-    fn generate_statement(&mut self, statement: &Statement) -> DynoResult<()> {
-        match statement {
-            Statement::If(condition, true_statement) => self.generate_if(condition, true_statement),
-            Statement::While(condition, body) => self.generate_while(condition, body),
-            Statement::Return(x) => self.generate_return(x),
-            Statement::Block(children) => {
-                self.variables.push();
-                for child in children {
-                    self.generate_statement(&child)?;
-                }
-                self.variables.pop()?;
-                Ok(())
-            }
-            Statement::Declaration(name, value_type) => self.generate_declaration(name, value_type),
-            Statement::Assignment(name, expression) => self.generate_assignment(name, expression),
-        }
-    }
-
     pub fn jit_execute(&mut self, ast: &Statement) -> DynoResult<u64> {
         let i64_type = self.context.i64_type();
         let fn_type = i64_type.fn_type(&[], false);
@@ -272,7 +275,7 @@ pub fn compile_and_run(statement: &Statement) -> DynoResult<u64> {
     let context = Context::create();
     let module = context.create_module("jit");
     let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
-    let mut code_generator = CodeGenerator {
+    let mut code_generator = LlvmBackend {
         context: &context,
         module,
         builder: context.create_builder(),

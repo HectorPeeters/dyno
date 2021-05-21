@@ -1,6 +1,5 @@
-
 use dyno::error::DynoResult;
-use dyno::generator::compile_and_run;
+use dyno::backend::llvm_backend::compile_and_run;
 use dyno::lexer::lex;
 use dyno::parser::parse;
 
