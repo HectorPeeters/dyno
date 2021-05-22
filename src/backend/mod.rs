@@ -1,4 +1,3 @@
-pub mod llvm_backend;
 pub mod x86_backend;
 
 use crate::ast::Statement;

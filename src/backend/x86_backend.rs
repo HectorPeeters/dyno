@@ -62,3 +62,7 @@ impl X86Backend {
         Ok(())
     }
 }
+
+pub fn compile_and_run(ast: &Statement) -> DynoResult<u64> {
+    Ok(0)
+}
