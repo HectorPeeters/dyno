@@ -1,11 +1,10 @@
-use crate::lexer::TokenType;
+use crate::token::TokenType;
 use crate::types::DynoType;
 use std::fmt;
-use std::ops::Range;
 
 #[derive(Debug, PartialEq)]
 pub enum DynoError {
-    LexerError(String, Range<usize>),
+    LexerError(String),
     TokenStreamOutOfBounds(),
     IntegerParseError(String),
     UnexpectedTokenError(TokenType, Vec<TokenType>),
@@ -17,18 +16,11 @@ pub enum DynoError {
     VisitError(String),
     NoneError(),
     IntoInnerError(),
-    LlvmError(String),
 }
 
 impl<T> From<std::io::IntoInnerError<T>> for DynoError {
     fn from(_error: std::io::IntoInnerError<T>) -> Self {
         DynoError::IntoInnerError()
-    }
-}
-
-impl From<inkwell::support::LLVMString> for DynoError {
-    fn from(error: inkwell::support::LLVMString) -> Self {
-        DynoError::LlvmError(error.to_string())
     }
 }
 
@@ -39,11 +31,7 @@ impl fmt::Display for DynoError {
         use DynoError::*;
 
         match self {
-            LexerError(message, location) => write!(
-                f,
-                "Lexer error on {}-{}: {}",
-                location.start, location.end, message
-            ),
+            LexerError(message) => write!(f, "Lexer error on: {}", message),
             TokenStreamOutOfBounds() => write!(f, "Token stream out of bounds"),
             IntegerParseError(contents) => write!(f, "Integer parse error: {}", contents),
             UnexpectedTokenError(received, expected) => {
@@ -63,7 +51,6 @@ impl fmt::Display for DynoError {
             VisitError(message) => write!(f, "Visit error: {}", message),
             NoneError() => write!(f, "None error"),
             IntoInnerError() => write!(f, "Into inner error"),
-            LlvmError(message) => write!(f, "LLVM error: {}", message),
         }
     }
 }

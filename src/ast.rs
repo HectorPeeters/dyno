@@ -1,6 +1,6 @@
 use crate::error::*;
-use crate::lexer::TokenType;
 use crate::scope::Scope;
+use crate::token::TokenType;
 use crate::types::{DynoType, DynoValue};
 use std::cmp::Ordering;
 

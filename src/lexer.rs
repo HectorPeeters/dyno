@@ -1,136 +1,99 @@
 use crate::error::*;
-use logos::Logos;
-use std::ops::Range;
+use crate::token::{Token, TokenType};
+use regex::Regex;
 
-#[derive(Logos, Debug, Copy, Clone, PartialEq)]
-pub enum TokenType {
-    #[regex(r"[ \t\n\f]+")]
-    Whitespace,
-
-    #[regex(r"let")]
-    Let,
-    #[regex(r"while")]
-    While,
-    #[regex(r"return")]
-    Return,
-    #[regex(r"if")]
-    If,
-
-    #[regex(r"u8")]
-    UInt8,
-    #[regex(r"u16")]
-    UInt16,
-    #[regex(r"u32")]
-    UInt32,
-    #[regex(r"u64")]
-    UInt64,
-    #[regex(r"bool")]
-    Bool,
-
-    #[regex(r"[a-zA-Z][_a-zA-Z]*")]
-    Identifier,
-
-    #[regex(r"[0-9]+")]
-    IntegerLiteral,
-
-    #[regex(r"\+")]
-    Plus,
-    #[regex(r"-")]
-    Minus,
-    #[regex(r"\*")]
-    Asterix,
-    #[regex(r"/")]
-    Slash,
-
-    #[regex(r"==")]
-    DoubleEqual,
-    #[regex(r"!=")]
-    NotEqual,
-    #[regex(r"<")]
-    LessThan,
-    #[regex(r"<=")]
-    LessThanEqual,
-    #[regex(r">")]
-    GreaterThan,
-    #[regex(r">=")]
-    GreaterThanEqual,
-
-    #[regex(r"=")]
-    Equals,
-
-    #[regex(r":")]
-    Colon,
-    #[regex(r";")]
-    SemiColon,
-
-    #[regex(r"\(")]
-    LeftParen,
-    #[regex(r"\)")]
-    RightParen,
-
-    #[regex(r"\{")]
-    LeftBrace,
-    #[regex(r"\}")]
-    RightBrace,
-
-    #[error]
-    Error,
+pub struct Lexer<'a> {
+    rules: Vec<(Regex, TokenType)>,
+    input: &'a str,
+    pointer: usize,
 }
 
-#[derive(Debug)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub value: String,
-    pub span: Range<usize>,
-}
+impl<'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Self {
+        use TokenType::*;
 
-impl PartialEq for Token {
-    fn eq(&self, other: &Self) -> bool {
-        self.token_type == other.token_type && self.value == other.value
-    }
-}
+        let rules = vec![
+            (r"[ \t\n\f]+", Whitespace),
+            (r"let", Let),
+            (r"while", While),
+            (r"return", Return),
+            (r"if", If),
+            (r"u8", UInt8),
+            (r"u16", UInt16),
+            (r"u32", UInt32),
+            (r"u64", UInt64),
+            (r"bool", Bool),
+            (r"[a-zA-Z][_a-zA-Z]*", Identifier),
+            (r"[0-9]+", IntegerLiteral),
+            (r"\+", Plus),
+            (r"-", Minus),
+            (r"\*", Asterix),
+            (r"/", Slash),
+            (r"==", DoubleEqual),
+            (r"!=", NotEqual),
+            (r"<=", LessThanEqual),
+            (r"<", LessThan),
+            (r">=", GreaterThanEqual),
+            (r">", GreaterThan),
+            (r"=", Equals),
+            (r":", Colon),
+            (r";", SemiColon),
+            (r"\(", LeftParen),
+            (r"\)", RightParen),
+            (r"\{", LeftBrace),
+            (r"\}", RightBrace),
+        ];
 
-impl PartialEq<TokenType> for &Token {
-    fn eq(&self, other: &TokenType) -> bool {
-        self.token_type == *other
-    }
-}
+        let rules = rules
+            .into_iter()
+            .map(|x| (Regex::new(x.0).unwrap(), x.1))
+            .collect();
 
-impl Token {
-    pub fn new(token_type: TokenType, value: &str) -> Self {
         Self {
-            token_type,
-            value: value.to_string(),
-            span: 0..0,
+            rules,
+            input,
+            pointer: 0,
         }
     }
 
-    pub fn with_type(token_type: TokenType) -> Self {
-        Self {
-            token_type,
-            value: String::default(),
-            span: 0..0,
-        }
-    }
+    pub fn get_tokens(&mut self) -> DynoResult<Vec<Token>> {
+        let mut result = vec![];
 
-    pub fn new_with_span(token_type: TokenType, value: &str, span: Range<usize>) -> Self {
-        Self {
-            token_type,
-            value: value.to_string(),
-            span,
+        loop {
+            if self.pointer >= self.input.len() {
+                break;
+            }
+
+            let mut matches = vec![];
+            for rule in &self.rules {
+                if let Some(x) = rule.0.find(&self.input[self.pointer..]) {
+                    if x.start() == 0 {
+                        matches.push(Token::new_with_span(rule.1, x.as_str(), x.range()));
+                    }
+                }
+            }
+
+            if matches.is_empty() {
+                return Err(DynoError::LexerError("Unable to lex".to_string()));
+            }
+
+            matches.sort_unstable_by(|a, b| {
+                (b.span.end - b.span.start).cmp(&(a.span.end - a.span.start))
+            });
+            let best_match = matches.remove(0);
+            self.pointer += best_match.span.end;
+            result.push(best_match);
         }
+
+        Ok(result
+            .into_iter()
+            .filter(|x| x.token_type != TokenType::Whitespace)
+            .collect())
     }
 }
 
 pub fn lex(input: &str) -> DynoResult<Vec<Token>> {
-    TokenType::lexer(input)
-        .spanned()
-        .filter(|t| t.0 != TokenType::Whitespace)
-        .map(|t| match t.0 {
-            TokenType::Error => Err(DynoError::LexerError(input[t.1.clone()].to_string(), t.1)),
-            _ => Ok(Token::new_with_span(t.0, &input[t.1.clone()], t.1)),
-        })
-        .collect()
+    Lexer::new(input).get_tokens()
 }
 
 #[cfg(test)]
@@ -217,10 +180,6 @@ mod tests {
         let tokens = lex("_identifier");
 
         assert!(tokens.is_err());
-        assert_eq!(
-            tokens.err().unwrap(),
-            DynoError::LexerError("_".to_string(), 0..1)
-        );
     }
 
     #[test]
@@ -228,9 +187,5 @@ mod tests {
         let tokens = lex("return &;");
 
         assert!(tokens.is_err());
-        assert_eq!(
-            tokens.err().unwrap(),
-            DynoError::LexerError("&".to_string(), 7..8)
-        );
     }
 }

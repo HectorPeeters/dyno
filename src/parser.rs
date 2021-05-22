@@ -1,7 +1,7 @@
 use crate::ast::{BinaryOperationType, Expression, Statement};
 use crate::error::*;
-use crate::lexer::{Token, TokenType};
 use crate::scope::Scope;
+use crate::token::{Token, TokenType};
 use crate::types::{DynoType, DynoValue};
 
 struct Parser {
@@ -301,7 +301,7 @@ mod tests {
     use crate::ast::Expression::{BinaryOperation, Literal, Widen};
     use crate::ast::Statement::{Assignment, Block, Declaration, If, Return};
     use crate::lexer::lex;
-    use crate::lexer::TokenType::*;
+    use crate::token::TokenType::*;
 
     #[test]
     fn parser_new() {
