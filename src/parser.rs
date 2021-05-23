@@ -535,7 +535,7 @@ mod tests {
         let mut parser = Parser::new(vec![]);
         let token = parser.consume();
 
-        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+        assert!(token.is_err());
     }
 
     #[test]
@@ -543,7 +543,7 @@ mod tests {
         let parser = Parser::new(vec![]);
         let token = parser.peek();
 
-        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+        assert!(token.is_err());
     }
 
     #[test]
@@ -551,7 +551,7 @@ mod tests {
         let parser = Parser::new(vec![Token::with_type(SemiColon)]);
         let token = parser.peek_next(1);
 
-        assert_eq!(token, Err(DynoError::TokenStreamOutOfBounds()));
+        assert!(token.is_err());
     }
 
     #[test]
@@ -559,13 +559,7 @@ mod tests {
         let mut parser = Parser::new(vec![Token::with_type(SemiColon)]);
         let token = parser.consume_expect(IntegerLiteral);
 
-        assert_eq!(
-            token,
-            Err(DynoError::UnexpectedTokenError(
-                SemiColon,
-                vec![IntegerLiteral]
-            ))
-        );
+        assert!(token.is_err());
     }
 
     #[test]
@@ -573,7 +567,7 @@ mod tests {
         let mut parser = Parser::new(vec![Token::new(IntegerLiteral, "a")]);
         let node = parser.parse_integer_literal();
 
-        assert_eq!(node, Err(DynoError::IntegerParseError("a".to_string())));
+        assert!(node.is_err());
     }
 
     #[test]
@@ -581,7 +575,7 @@ mod tests {
         let mut parser = Parser::new(vec![Token::new(IntegerLiteral, "a")]);
         let node = parser.parse_integer_literal();
 
-        assert_eq!(node, Err(DynoError::IntegerParseError("a".to_string())));
+        assert!(node.is_err());
     }
 
     #[test]

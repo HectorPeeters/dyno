@@ -225,6 +225,8 @@ mod tests {
             )),
         );
 
-        assert_eq!(ast.get_type(&Scope::default()), Ok(DynoType::UInt8()));
+        let ast_type = ast.get_type(&Scope::default());
+        assert!(ast_type.is_ok());
+        assert_eq!(ast_type.unwrap(), DynoType::UInt8());
     }
 }

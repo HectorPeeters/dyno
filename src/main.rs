@@ -52,7 +52,6 @@ fn main() {
             println!("{:#?}", ast);
         }
 
-        // Jit execution
         let result = backend::x86_backend::compile_and_run(&ast);
         if result.is_err() {
             eprintln!("Failed to compile and run ast: {}", result.err().unwrap());

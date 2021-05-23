@@ -2,7 +2,7 @@ use crate::token::TokenType;
 use crate::types::DynoType;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum DynoError {
     LexerError(String),
     TokenStreamOutOfBounds(),
@@ -16,11 +16,18 @@ pub enum DynoError {
     VisitError(String),
     NoneError(),
     IntoInnerError(),
+    IOError(std::io::Error),
 }
 
 impl<T> From<std::io::IntoInnerError<T>> for DynoError {
     fn from(_error: std::io::IntoInnerError<T>) -> Self {
         DynoError::IntoInnerError()
+    }
+}
+
+impl From<std::io::Error> for DynoError {
+    fn from(error: std::io::Error) -> Self {
+        DynoError::IOError(error)
     }
 }
 
@@ -51,6 +58,7 @@ impl fmt::Display for DynoError {
             VisitError(message) => write!(f, "Visit error: {}", message),
             NoneError() => write!(f, "None error"),
             IntoInnerError() => write!(f, "Into inner error"),
+            IOError(error) => write!(f, "IO Error: {}", error),
         }
     }
 }
