@@ -65,10 +65,13 @@ impl<'a> Lexer<'a> {
             }
 
             let mut matches = vec![];
+
             for rule in &self.rules {
-                if let Some(x) = rule.0.find(&self.input[self.pointer..]) {
+                let (regex, token_type) = rule;
+
+                if let Some(x) = regex.find(&self.input[self.pointer..]) {
                     if x.start() == 0 {
-                        matches.push(Token::new_with_span(rule.1, x.as_str(), x.range()));
+                        matches.push(Token::new_with_span(*token_type, x.as_str(), x.range()));
                     }
                 }
             }
@@ -77,11 +80,11 @@ impl<'a> Lexer<'a> {
                 return Err(DynoError::LexerError("Unable to lex".to_string()));
             }
 
-            matches.sort_by(|a, b| {
-                (b.span.end - b.span.start).cmp(&(a.span.end - a.span.start))
-            });
+            matches.sort_by(|a, b| (b.span.end - b.span.start).cmp(&(a.span.end - a.span.start)));
+
             let best_match = matches.remove(0);
             self.pointer += best_match.span.end;
+
             result.push(best_match);
         }
 
