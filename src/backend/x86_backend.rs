@@ -102,15 +102,38 @@ impl X86Backend {
     ) -> DynoResult<Register> {
         use BinaryOperationType::*;
 
+        println!("{:#?}\n{:#?}", left, right);
+
         let left = self.generate_expression(left)?;
         let right = self.generate_expression(right)?;
 
+        println!("{} {}", left, right);
+
         match op_type {
-            Add => writeln!(self.writer, "add {}, {}", REG_NAMES[left], REG_NAMES[right])?,
+            Add => writeln!(
+                self.writer,
+                "addq {}, {}",
+                REG_NAMES[right], REG_NAMES[left]
+            )?,
+            Subtract => writeln!(
+                self.writer,
+                "subq {}, {}",
+                REG_NAMES[right], REG_NAMES[left]
+            )?,
+            Multiply => writeln!(
+                self.writer,
+                "imul {}, {}",
+                REG_NAMES[right], REG_NAMES[left]
+            )?,
+            Divide => writeln!(
+                self.writer,
+                "movq {}, %rax\nmovq $0, %rdx\ndivq {}\nmovq %rax, {}",
+                REG_NAMES[left], REG_NAMES[right], REG_NAMES[left]
+            )?,
             _ => todo!(),
         }
-        self.deallocate_reg(left)?;
-        Ok(right)
+        self.deallocate_reg(right)?;
+        Ok(left)
     }
 
     fn generate_literal(
@@ -118,16 +141,12 @@ impl X86Backend {
         value_type: &DynoType,
         value: &DynoValue,
     ) -> DynoResult<Register> {
-        use crate::types::DynoType::*;
         use crate::types::DynoValue::*;
 
         let reg = self.allocate_reg()?;
 
         match (value_type, value) {
-            (UInt8(), UInt(x)) => writeln!(self.writer, "mov ${}, {}", x, REG_NAMES[reg])?,
-            (UInt16(), UInt(x)) => writeln!(self.writer, "mov ${}, {}", x, REG_NAMES[reg])?,
-            (UInt32(), UInt(x)) => writeln!(self.writer, "mov ${}, {}", x, REG_NAMES[reg])?,
-            (UInt64(), UInt(x)) => writeln!(self.writer, "mov ${}, {}", x, REG_NAMES[reg])?,
+            (_, UInt(x)) => writeln!(self.writer, "movq ${}, {}", x, REG_NAMES[reg])?,
             _ => {
                 return Err(DynoError::GeneratorError(format!(
                     "Failed to generate literal for {:?}, {:?}",
@@ -136,7 +155,7 @@ impl X86Backend {
             }
         }
 
-        Ok(0)
+        Ok(reg)
     }
 
     fn generate_widen(
@@ -144,7 +163,8 @@ impl X86Backend {
         expression: &Expression,
         value_type: &DynoType,
     ) -> DynoResult<Register> {
-        Ok(0)
+        //TODO: actually implement widen heres
+        return self.generate_expression(expression);
     }
 
     fn generate_identifier(&mut self, name: &str) -> DynoResult<Register> {
@@ -156,17 +176,17 @@ impl X86Backend {
         condition: &Expression,
         true_statement: &Statement,
     ) -> DynoResult<()> {
-        Ok(())
+        todo!();
     }
 
     fn generate_while(&mut self, condition: &Expression, body: &Statement) -> DynoResult<()> {
-        Ok(())
+        todo!();
     }
 
     fn generate_return(&mut self, expression: &Expression) -> DynoResult<()> {
         let reg = self.generate_expression(expression)?;
 
-        writeln!(self.writer, "mov {}, %rax", REG_NAMES[reg])?;
+        writeln!(self.writer, "movq {}, %rax", REG_NAMES[reg])?;
         writeln!(self.writer, "ret")?;
 
         self.deallocate_reg(reg)
@@ -180,11 +200,11 @@ impl X86Backend {
     }
 
     fn generate_declaration(&mut self, name: &str, value_type: &DynoType) -> DynoResult<()> {
-        Ok(())
+        todo!();
     }
 
     fn generate_assignment(&mut self, name: &str, expression: &Expression) -> DynoResult<()> {
-        Ok(())
+        todo!();
     }
 }
 
@@ -212,11 +232,12 @@ pub fn compile_and_run(ast: &Statement) -> DynoResult<u64> {
         .status()?;
 
     if compile_status.code().unwrap() != 0 {
-        return Err(DynoError::GeneratorError(
-            "Failed to compile assembly".to_string(),
-        ));
+        return Err(DynoError::GeneratorError(format!(
+            "Failed to compile assembly"
+        )));
     }
 
+    //TODO: change this to support 64 bit integer output
     let status = Command::new(&executable).status()?;
 
     Ok(status.code().unwrap() as u64)

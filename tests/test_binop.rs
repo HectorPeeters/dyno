@@ -20,7 +20,7 @@ fn execute_subtract_expression() -> DynoResult<()> {
 
 #[test]
 fn execute_add_subtract_expression() -> DynoResult<()> {
-    assert_run("return 42 - 12 + 12 - 5 + 2284;", 2321)
+    assert_run("return 42 - 12 + 12 - 5 + 2284 - 2300;", 21)
 }
 
 #[test]
