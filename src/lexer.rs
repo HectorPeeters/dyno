@@ -77,7 +77,7 @@ impl<'a> Lexer<'a> {
                 return Err(DynoError::LexerError("Unable to lex".to_string()));
             }
 
-            matches.sort_unstable_by(|a, b| {
+            matches.sort_by(|a, b| {
                 (b.span.end - b.span.start).cmp(&(a.span.end - a.span.start))
             });
             let best_match = matches.remove(0);
