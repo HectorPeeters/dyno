@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use dyno::*;
 use std::env;
 use std::io::{stdin, stdout, Write};

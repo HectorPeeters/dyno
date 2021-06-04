@@ -8,7 +8,7 @@ use std::io::Write;
 use std::process::Command;
 use std::time::SystemTime;
 
-const REG_NAMES: [&'static str; 4] = ["%r8", "%r9", "%r10", "%r11"];
+const REG_NAMES: [&str; 4] = ["%r8", "%r9", "%r10", "%r11"];
 
 pub struct X86Backend {
     writer: BufWriter<File>,
@@ -161,25 +161,25 @@ impl X86Backend {
     fn generate_widen(
         &mut self,
         expression: &Expression,
-        value_type: &DynoType,
+        _value_type: &DynoType,
     ) -> DynoResult<Register> {
         //TODO: actually implement widen heres
-        return self.generate_expression(expression);
+        self.generate_expression(expression)
     }
 
-    fn generate_identifier(&mut self, name: &str) -> DynoResult<Register> {
+    fn generate_identifier(&mut self, _name: &str) -> DynoResult<Register> {
         Ok(0)
     }
 
     fn generate_if(
         &mut self,
-        condition: &Expression,
-        true_statement: &Statement,
+        _condition: &Expression,
+        _true_statement: &Statement,
     ) -> DynoResult<()> {
         todo!();
     }
 
-    fn generate_while(&mut self, condition: &Expression, body: &Statement) -> DynoResult<()> {
+    fn generate_while(&mut self, _condition: &Expression, _body: &Statement) -> DynoResult<()> {
         todo!();
     }
 
@@ -192,6 +192,7 @@ impl X86Backend {
         self.deallocate_reg(reg)
     }
 
+    #[allow(dead_code)]
     fn generate_block(&mut self, children: &[Statement]) -> DynoResult<()> {
         for child in children {
             self.generate_statement(child)?;
@@ -199,11 +200,11 @@ impl X86Backend {
         Ok(())
     }
 
-    fn generate_declaration(&mut self, name: &str, value_type: &DynoType) -> DynoResult<()> {
+    fn generate_declaration(&mut self, _name: &str, _value_type: &DynoType) -> DynoResult<()> {
         todo!();
     }
 
-    fn generate_assignment(&mut self, name: &str, expression: &Expression) -> DynoResult<()> {
+    fn generate_assignment(&mut self, _name: &str, _expression: &Expression) -> DynoResult<()> {
         todo!();
     }
 }
@@ -232,9 +233,9 @@ pub fn compile_and_run(ast: &Statement) -> DynoResult<u64> {
         .status()?;
 
     if compile_status.code().unwrap() != 0 {
-        return Err(DynoError::GeneratorError(format!(
-            "Failed to compile assembly"
-        )));
+        return Err(DynoError::GeneratorError(
+            "Failed to compile assembly".to_string(),
+        ));
     }
 
     //TODO: change this to support 64 bit integer output
