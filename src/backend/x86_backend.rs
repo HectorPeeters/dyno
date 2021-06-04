@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
 use std::process::Command;
+use std::time::SystemTime;
 
 const REG_NAMES: [&'static str; 4] = ["%r8", "%r9", "%r10", "%r11"];
 
@@ -50,9 +51,9 @@ impl Backend for X86Backend {
 }
 
 impl X86Backend {
-    fn new() -> Self {
+    fn new(file_name: &str) -> Self {
         Self {
-            writer: BufWriter::new(File::create("output.s").unwrap()),
+            writer: BufWriter::new(File::create(file_name).unwrap()),
             regs: [false; 4],
         }
     }
@@ -99,7 +100,17 @@ impl X86Backend {
         left: &Expression,
         right: &Expression,
     ) -> DynoResult<Register> {
-        Ok(0)
+        use BinaryOperationType::*;
+
+        let left = self.generate_expression(left)?;
+        let right = self.generate_expression(right)?;
+
+        match op_type {
+            Add => writeln!(self.writer, "add {}, {}", REG_NAMES[left], REG_NAMES[right])?,
+            _ => todo!(),
+        }
+        self.deallocate_reg(left)?;
+        Ok(right)
     }
 
     fn generate_literal(
@@ -162,6 +173,9 @@ impl X86Backend {
     }
 
     fn generate_block(&mut self, children: &[Statement]) -> DynoResult<()> {
+        for child in children {
+            self.generate_statement(child)?;
+        }
         Ok(())
     }
 
@@ -175,15 +189,26 @@ impl X86Backend {
 }
 
 pub fn compile_and_run(ast: &Statement) -> DynoResult<u64> {
-    let mut backend = X86Backend::new();
+    std::fs::create_dir_all("target/x86")?;
+
+    //TODO: replace this with a hash or something
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let assembly_file = format!("target/x86/{}.s", time);
+
+    let mut backend = X86Backend::new(&assembly_file);
     backend.generate_header()?;
     backend.generate_statement(ast)?;
     backend.finish()?;
 
+    let executable = format!("target/x86/{}.out", time);
+
     let compile_status = Command::new("cc")
-        .arg("output.s")
+        .arg(&assembly_file)
         .arg("-o")
-        .arg("main.out")
+        .arg(&executable)
         .status()?;
 
     if compile_status.code().unwrap() != 0 {
@@ -192,7 +217,7 @@ pub fn compile_and_run(ast: &Statement) -> DynoResult<u64> {
         ));
     }
 
-    let status = Command::new("./main.out").status()?;
+    let status = Command::new(&executable).status()?;
 
     Ok(status.code().unwrap() as u64)
 }
